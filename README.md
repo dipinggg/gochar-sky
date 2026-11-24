@@ -18,9 +18,9 @@ Birth details are saved only in your own browser (`localStorage`). They are neve
 
 ## How it works
 
-Everything is a single `index.html` with no build step.
+Everything is in `index.html` plus the planet library beside it, with no build step.
 
-- Planet positions: [Astronomy Engine](https://github.com/cosinekitty/astronomy) (MIT), loaded from jsDelivr.
+- Planet positions: [Astronomy Engine](https://github.com/cosinekitty/astronomy) (MIT), included as `astronomy.browser.min.js` so the site doesn't depend on an outside CDN.
 - Sidereal longitudes use the Lahiri ayanamsa. Rahu and Ketu are the mean lunar nodes. Houses are whole signs from the Lagna.
 - Birth times are converted to UTC with your browser's time zone database, so historical offsets and daylight saving are handled (for example, India's +6:30 wartime clock in 1942–45).
 - Stars, constellation lines and the Milky Way outline come from [d3-celestial](https://github.com/ofrohn/d3-celestial) (BSD 3-Clause, Hipparcos catalogue). See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
