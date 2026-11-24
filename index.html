@@ -148,6 +148,13 @@ form.add{display:grid;gap:8px;margin-top:8px}
 .clock{font-family:var(--f-data);font-size:.98rem;font-variant-numeric:tabular-nums;white-space:nowrap;min-width:0}
 .clock small{color:var(--muted);font-size:.74rem;margin-left:5px}
 .jump{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:center}
+.seg.steps button{color:var(--ink);padding:7px 10px;font-size:.8rem}
+.seg.steps button:hover{background:rgba(255,255,255,.07)}
+.seg.steps button:active{background:rgba(255,255,255,.13)}
+.btn.play{display:inline-flex;align-items:center;gap:6px;min-width:86px;justify-content:center}
+.btn.play.paused{background:var(--gold);border-color:var(--gold);color:#1B1405}
+#birthjump .narrow{display:none}
+.tb-br{display:none}
 
 .tip{position:absolute;z-index:4;pointer-events:none;max-width:260px;background:var(--glass-hi);border:1px solid var(--edge);border-radius:10px;padding:8px 10px;font-size:.8rem;line-height:1.45;box-shadow:0 8px 30px rgba(0,0,0,.5)}
 .tip b{color:var(--gold);font-weight:600}
@@ -160,7 +167,21 @@ form.add{display:grid;gap:8px;margin-top:8px}
   .brand h1{font-size:1.15rem}
   .index{grid-column:1/-1;grid-row:2;justify-self:stretch}
   .panel{left:0;right:0;top:auto;bottom:0;width:auto;max-height:70%;border-radius:16px 16px 0 0;z-index:5}
-  .timebar{bottom:8px;padding:8px}
+  /* phones: one flowing row set — clock + Birth / date, time, Go / steps around Now / Play + speeds */
+  .timebar{bottom:8px;padding:8px;display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:7px 6px}
+  .timebar .trow{display:contents}
+  .tb-br{display:block;flex-basis:100%;height:0}
+  .clock{order:1;font-size:.8rem} #birthjump{order:2} .tb-br.b1{order:3}
+  .timebar .jump{order:4} .tb-br.b2{order:5}
+  .seg.steps.back{order:6} #now{order:7} .seg.steps.fwd{order:8} .tb-br.b3{order:9}
+  .btn.play{order:10} #speed{order:11}
+  .timebar .btn{padding:6px 9px;font-size:.8rem}
+  .timebar input[type=date],.timebar input[type=time]{font-size:.8rem;padding:5px 6px}
+  .seg.steps button{padding:6px 8px;font-size:.76rem}
+  #birthjump .wide{display:none} #birthjump .narrow{display:inline}
+  .btn.play{min-width:0;padding:6px 8px}
+  .btn.play span{display:none}
+  #speed button{padding:6px 5px;font-size:.7rem}
   .clock{font-size:.88rem}
   .toast{top:104px}
   .iconbtn{padding:7px 9px}
@@ -241,17 +262,29 @@ form.add{display:grid;gap:8px;margin-top:8px}
   <div class="hud timebar glass" aria-label="Time travel">
     <div class="trow">
       <span class="clock" id="clock">—</span>
+      <button class="btn" type="button" id="now">Now</button>
+      <button class="btn" type="button" id="birthjump" aria-label="Jump to birth moment"><span class="wide">Birth moment</span><span class="narrow">Birth</span></button>
+      <span class="tb-br b1" aria-hidden="true"></span><span class="tb-br b2" aria-hidden="true"></span><span class="tb-br b3" aria-hidden="true"></span>
+    </div>
+    <div class="trow jumprow">
+      <div class="seg steps back" role="group" aria-label="Step back">
+        <button type="button" data-years="-1" aria-label="Back one year">−1 yr</button>
+        <button type="button" data-step="-1" aria-label="Back one day">−1 day</button>
+      </div>
       <div class="jump">
-        <button class="btn" type="button" data-step="-1" aria-label="Back one day">−1 day</button>
         <input type="date" id="jd" aria-label="Jump to date">
         <input type="time" id="jt" aria-label="Jump to time, local to the sky location">
         <button class="btn primary" type="button" id="go">Go</button>
-        <button class="btn" type="button" data-step="1" aria-label="Forward one day">+1 day</button>
       </div>
-      <button class="btn" type="button" id="now">Now</button>
-      <button class="btn" type="button" id="birthjump">Birth moment</button>
+      <div class="seg steps fwd" role="group" aria-label="Step forward">
+        <button type="button" data-step="1" aria-label="Forward one day">+1 day</button>
+        <button type="button" data-years="1" aria-label="Forward one year">+1 yr</button>
+      </div>
     </div>
-    <div class="trow"><div class="seg" id="speed" role="group" aria-label="Time speed"></div></div>
+    <div class="trow">
+      <button class="btn play" type="button" id="play" aria-label="Pause time"></button>
+      <div class="seg" id="speed" role="group" aria-label="Time speed"></div>
+    </div>
   </div>
 
   <button class="hud hvarrow glass" id="hv-left" type="button" hidden><span aria-hidden="true">‹</span><small id="hv-left-l"></small></button>
@@ -437,7 +470,7 @@ const PLACES = [["Bengaluru, Karnataka, India",12.97,77.59,"Asia/Kolkata"],["Tha
 const DEFAULT_PERSON = {"id": "sample", "name": "Sample chart", "date": "2000-01-01", "time": "12:00", "place": "Ujjain, Madhya Pradesh, India", "lat": 23.18, "lon": 75.78, "tz": "Asia/Kolkata", "fixed": true, "sample": true};
 const DEFAULT_SKY = null;
 const ASK_ON_FIRST_VISIT = true;
-const RATES = [[-604800,"−1 wk/s"],[-86400,"−1 day/s"],[0,"Pause"],[1,"Live"],[86400,"+1 day/s"],[604800,"+1 wk/s"]];
+const RATES = [[-604800,"−1 wk/s"],[-86400,"−1 day/s"],[1,"Live"],[86400,"+1 day/s"],[604800,"+1 wk/s"]];
 const LAYER_GROUPS = [
   ["Planets", [["now","Planets now",true],["birth","Birth chart (faint)",true],["contacts","Close contacts",true]]],
   ["Zodiac",  [["band","Sign bands",true],["signs","Sign names",true],["houses","House numbers",true],["nak","Nakshatras",false]]],
@@ -493,6 +526,7 @@ let obs = new A.Observer(loc.lat, loc.lon, 0);
 
 // time
 let live = true, rate = 1, simBase = Date.now(), realBase = performance.now(), jump = null;
+let lastRate = 1;   // the speed Play goes back to after a pause (1 = normal speed)
 const simNow = () => live ? Date.now() : simBase + (performance.now() - realBase) * rate;
 // view
 const view = {az: 90, alt: 32, fov: 100};
@@ -1224,6 +1258,7 @@ ov.addEventListener("wheel", e => {
 ov.addEventListener("dblclick", e => e.preventDefault());
 window.addEventListener("keydown", e => {
   if (e.target.closest("input,select,textarea")) return;
+  if (e.key === " " && !e.target.closest("button,a,summary") && !e.metaKey && !e.ctrlKey) { e.preventDefault(); togglePlay(); return; }
   if (hv) {
     if (e.key === "ArrowLeft") hvStep(1); else if (e.key === "ArrowRight") hvStep(-1); else if (e.key === "Escape") exitHV(); else return;
     e.preventDefault(); return;
@@ -1245,12 +1280,12 @@ function showTip(x, y, tap) {
 
 /* ---------------- time travel ---------------- */
 function toast(msg, ms = 2200) { const t = $("toast"); t.textContent = msg; t.style.opacity = "1"; clearTimeout(toast.h); toast.h = setTimeout(() => t.style.opacity = "0", ms); }
-function travelTo(target, endLive) {
+function travelTo(target, endLive, thenPlay = false) {
   const from = currentTp();
   const days = Math.abs(target - from) / DAY;
-  if (REDUCED || days < 1 / 1440) { if (endLive) goLive(); else setPaused(target); return; }
+  if (REDUCED || days < 1 / 1440) { jump = null; if (endLive) goLive(); else { setPaused(target); if (thenPlay) setRate(lastRate); } return; }
   const lon = loc.lon;
-  jump = {t0: performance.now(), dur: clamp(900 + 700 * Math.log10(1 + days), 900, 3800), from, to: target, endLive,
+  jump = {t0: performance.now(), dur: clamp(900 + 700 * Math.log10(1 + days), 900, 3800), from, to: target, endLive, thenPlay,
           lst0: localSidereal(new Date(from), lon), lst1: localSidereal(new Date(target), lon), ee: 0};
   live = false; rate = 0; markSpeed();
   toast(endLive ? "Back to now" : `Travelling to ${fmtT(target, {day: "numeric", month: "short", year: "numeric"})}, ${fmtT(target, {hour: "2-digit", minute: "2-digit", hour12: false})}`);
@@ -1264,16 +1299,50 @@ function times(now) {
   const lstE = jump.lst0 + norm180(jump.lst1 - jump.lst0) * e;
   const off = norm180(lstE - localSidereal(new Date(tp), loc.lon));
   const tf = tp + off / 360.98564736629 * DAY;
-  if (k >= 1) { const j = jump; jump = null; if (j.endLive) goLive(); else setPaused(j.to); return {tp: j.to, tf: j.to}; }
+  if (k >= 1) { const j = jump; jump = null; if (j.endLive) goLive(); else { setPaused(j.to); if (j.thenPlay) setRate(lastRate); } return {tp: j.to, tf: j.to}; }
   return {tp, tf};
 }
 function setPaused(ms) { simBase = ms; realBase = performance.now(); live = false; rate = 0; trailReset = true; skyDirty = true; markSpeed(); }
-function setRate(r) { jump = null; simBase = simNow(); realBase = performance.now(); live = false; rate = r; trailReset = true; markSpeed(); }
-function goLive() { jump = null; live = true; rate = 1; trailReset = true; skyDirty = true; markSpeed(); }
+function setRate(r) { jump = null; simBase = simNow(); realBase = performance.now(); live = false; rate = r; if (r !== 0) lastRate = r; trailReset = true; markSpeed(); }
+function goLive() { jump = null; live = true; rate = 1; lastRate = 1; trailReset = true; skyDirty = true; markSpeed(); }
+/* Play / Pause */
+const isMoving = () => jump ? !!(jump.endLive || jump.thenPlay) : (live || rate !== 0);
+const rateName = r => r === 1 ? "normal speed" : (RATES.find(x => x[0] === r) || [, r + "×"])[1];
+function togglePlay() {
+  if (jump) {   // mid-flight: decide what happens when it lands
+    if (isMoving()) { jump.endLive = false; jump.thenPlay = false; } else jump.thenPlay = true;
+    markSpeed(); return;
+  }
+  if (isMoving()) { setPaused(simNow()); toast("Paused"); return; }
+  if (lastRate === 1 && Math.abs(simNow() - Date.now()) < 60000) { goLive(); toast("Live"); return; }
+  setRate(lastRate); toast("Playing at " + rateName(lastRate));
+}
+const PLAY_ICONS = {pause: '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><rect x="3.5" y="2.5" width="3" height="11" rx="1" fill="currentColor"/><rect x="9.5" y="2.5" width="3" height="11" rx="1" fill="currentColor"/></svg>',
+                    play: '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M4.5 2.6v10.8a.6.6 0 0 0 .9.5l8.4-5.4a.6.6 0 0 0 0-1L5.4 2.1a.6.6 0 0 0-.9.5z" fill="currentColor"/></svg>'};
+$("play").addEventListener("click", togglePlay);
+// After a mouse or touch tap, let go of focus so the space bar means Play/Pause, not "press that button again".
+document.querySelector(".timebar").addEventListener("click", e => { const b = e.target.closest("button"); if (b && e.detail > 0) b.blur(); });
 $("speed").innerHTML = RATES.map(([r, l]) => `<button type="button" data-rate="${r}" class="${r === 1 ? "live" : ""}" aria-pressed="false">${l}</button>`).join("");
-function markSpeed() { $("speed").querySelectorAll("button").forEach(b => { const r = +b.dataset.rate; b.setAttribute("aria-pressed", String(r === 1 ? live : (!live && !jump && r === rate))); }); }
+function markSpeed() {
+  $("speed").querySelectorAll("button").forEach(b => { const r = +b.dataset.rate; b.setAttribute("aria-pressed", String(r === 1 ? live : (!live && !jump && r === rate))); });
+  const moving = isMoving(), pb = $("play");
+  pb.innerHTML = (moving ? PLAY_ICONS.pause : PLAY_ICONS.play) + `<span>${moving ? "Pause" : "Play"}</span>`;
+  pb.setAttribute("aria-label", moving ? "Pause time" : "Play time forward");
+  pb.classList.toggle("paused", !moving);
+}
 $("speed").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; const r = +b.dataset.rate; if (r === 1) travelTo(Date.now(), true); else setRate(r); });
-document.querySelectorAll("[data-step]").forEach(b => b.addEventListener("click", () => travelTo(currentTp() + Number(b.dataset.step) * DAY, false)));
+function addYears(ms, n) {   // same calendar date and clock time, n years away (29 Feb becomes 28 Feb)
+  const d = new Date(ms + tzOffset(loc.tz, ms) * 60000), y = d.getUTCFullYear() + n, m = d.getUTCMonth() + 1;
+  const dim = new Date(Date.UTC(2000, m, 0)).getUTCDate() - (m === 2 && !((y % 4 === 0 && y % 100 !== 0) || y % 400 === 0) ? 1 : 0);
+  return localToUTC(y, m, Math.min(d.getUTCDate(), dim), d.getUTCHours(), d.getUTCMinutes(), loc.tz);
+}
+function stepTo(target) {
+  const playing = jump ? !!jump.thenPlay : (!live && rate !== 0);   // keep a chosen speed running after the step
+  inputsEdited = false; travelTo(target, false, playing);
+}
+const stepBase = () => jump ? jump.to : currentTp();
+document.querySelectorAll("[data-step]").forEach(b => b.addEventListener("click", () => stepTo(stepBase() + Number(b.dataset.step) * DAY)));
+document.querySelectorAll("[data-years]").forEach(b => b.addEventListener("click", () => stepTo(addYears(stepBase(), Number(b.dataset.years)))));
 let inputsEdited = false;
 for (const id of ["jd", "jt"]) { $(id).addEventListener("input", () => inputsEdited = true); $(id).addEventListener("keydown", e => { if (e.key === "Enter") $("go").click(); }); }
 $("go").addEventListener("click", () => {
@@ -1403,7 +1472,7 @@ function updateReadings(contacts) {
   if (contacts.length) out.push(["hit", `${contacts.length} close contact${contacts.length > 1 ? "s" : ""}`]);
   $("readings").innerHTML = out.map(([c, h]) => `<span class="pill ${c}">${h}</span>`).join("");
   $("contacts").innerHTML = contacts.length ? contacts.slice().sort((a, b) => a.o - b.o).map(c => `<li class="contact"><span class="orb">${c.o.toFixed(1)}°</span><span>${c.b}${bodies[c.b].retro ? " (retrograde)" : ""} on birth <b>${c.n === "Asc" ? "Lagna" : c.n}</b></span></li>`).join("") : `<li class="empty">No planet is within 3° of a birth planet. The Moon is left out because it moves about 13° a day.</li>`;
-  const mode = hv ? "house view" : jump ? "travelling…" : live ? "live" : rate === 0 ? "paused" : (RATES.find(r => r[0] === rate) || [, ""])[1];
+  const mode = hv ? "house view" : jump ? "travelling…" : live ? "live" : rate === 0 ? "paused" : rate === 1 ? "playing" : (RATES.find(r => r[0] === rate) || [, ""])[1];
   $("status").innerHTML = `<b>${esc(shortPlace(loc.name))}</b> · ${mode}`;
 }
 
@@ -1412,7 +1481,7 @@ let lastTs = performance.now(), needBodies = true, lastPanel = 0, lastContacts =
 function frame(ts) {
   const dt = clamp(ts - lastTs, 0, 50); lastTs = ts;
   const {tp, tf} = times(ts);
-  const fast = jump || (!live && rate !== 0);
+  const fast = jump || (!live && Math.abs(rate) > 1);
   if (needBodies || !F || fast || Math.abs(tp - lastTp) > 1000) { computeBodies(tp, tf); lastTp = tp; lastTf = tf; needBodies = false; skyDirty = true; }
   if (layers.moonpath && !jump && (live || Math.abs(rate) <= 3600)) updateMoonPath(tp);
   updateView(dt); buildCam();
