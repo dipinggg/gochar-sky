@@ -456,11 +456,11 @@ const PLANETS = ["Sun","Moon","Mars","Mercury","Jupiter","Venus","Saturn","Rahu"
 const P = {
   Sun:     {col:"#FFD66B", rgb:"255,214,107", glow:"255,196,96",  r:15},
   Moon:    {col:"#ECEAE0", rgb:"236,234,224", glow:"236,236,228", r:5.2},
-  Mars:    {col:"#E8683F", rgb:"232,104,63",  glow:"255,146,100", r:6.6},
+  Mars:    {col:"#FF5A36", rgb:"255,90,54",   glow:"255,90,54",   r:6.6},
   Mercury: {col:"#ADA6A0", rgb:"173,166,160", glow:"232,226,218", r:5.8},
-  Jupiter: {col:"#E2B888", rgb:"226,184,136", glow:"255,226,182", r:11.5},
+  Jupiter: {col:"#F2B544", rgb:"242,181,68",  glow:"242,181,68",  r:11.5},
   Venus:   {col:"#F4E2B4", rgb:"244,226,180", glow:"255,244,214", r:7.6},
-  Saturn:  {col:"#DCC38E", rgb:"220,195,142", glow:"255,230,172", r:10.4},
+  Saturn:  {col:"#86A6FF", rgb:"134,166,255", glow:"134,166,255", r:10.4},
   Rahu:    {col:"#A68BFF", rgb:"166,139,255", glow:"166,139,255", r:7},
   Ketu:    {col:"#DEA0AE", rgb:"222,160,174", glow:"222,160,174", r:7}
 };
@@ -621,24 +621,6 @@ function paintLook(b) {
     blob(g, -0.1 * R, -0.18 * R, 0.95 * R, 0.16 * R, "206,164,104", 0.28, -0.32); blob(g, -0.1 * R, 0.18 * R, 0.95 * R, 0.16 * R, "206,164,104", 0.28, 0.32);
     blob(g, 0.25 * R, 0, 0.8 * R, 0.12 * R, "206,164,104", 0.22);
     streaks(g, R, rnd, 12, "255,249,228", "214,176,118", 0.3);
-  } else if (b === "Mars") {
-    disc(g, R, [[0, "#E98256"], [0.65, "#D4623A"], [1, "#B54B2D"]]);
-    for (const [x, y, rx, ry, rot, a] of [[0.12, -0.04, 0.34, 0.16, -0.7, 0.5], [-0.42, -0.34, 0.3, 0.13, 0.3, 0.42], [0.36, 0.34, 0.3, 0.12, 0.25, 0.4], [-0.25, 0.24, 0.24, 0.1, -0.2, 0.38], [-0.05, 0.05, 0.6, 0.08, 0.1, 0.25]])
-      blob(g, x * R, y * R, rx * R, ry * R, "112,44,28", a, rot);
-    blob(g, 0.05 * R, 0.55 * R, 0.22 * R, 0.14 * R, "246,170,120", 0.3);
-    craters(g, R, rnd, 10, 0.03, 0.07, "140,60,36", "250,190,150", 0.22);
-    blob(g, 0, -0.93 * R, 0.46 * R, 0.17 * R, "252,248,242", 0.95); blob(g, 0, 0.97 * R, 0.24 * R, 0.08 * R, "252,248,242", 0.6);
-  } else if (b === "Jupiter") {
-    bands(g, R, [[0, "#B99673"], [0.1, "#CDAA82"], [0.19, "#EFDAB7"], [0.27, "#C98D5C"], [0.33, "#E6CBA2"], [0.41, "#F5E6C9"], [0.5, "#EDD6B0"],
-      [0.56, "#C2814E"], [0.62, "#E5C398"], [0.7, "#F1DFBE"], [0.77, "#CFA071"], [0.85, "#E2C39B"], [0.93, "#C9A47C"], [1, "#B08D6C"]]);
-    streaks(g, R, rnd, 16, "255,246,228", "150,90,52", 0.2);
-    for (let i = 0; i < 6; i++) blob(g, (rnd() - 0.5) * 1.6 * R, -0.2 * R + rnd() * 0.05 * R, 0.08 * R, 0.03 * R, "140,84,48", 0.3, 0.4);
-    blob(g, 0.3 * R, 0.25 * R, 0.27 * R, 0.15 * R, "246,228,204", 0.4);    // the Great Red Spot and its pale collar
-    blob(g, 0.3 * R, 0.25 * R, 0.2 * R, 0.11 * R, "196,92,58", 0.9);
-  } else if (b === "Saturn") {
-    bands(g, R, [[0, "#B9A27A"], [0.12, "#CCB585"], [0.25, "#DCC593"], [0.38, "#E8D5A4"], [0.48, "#F1E1B6"], [0.56, "#EBD7A6"], [0.68, "#DFC796"], [0.8, "#D1B783"], [1, "#BDA170"]]);
-    streaks(g, R, rnd, 12, "255,246,222", "170,140,92", 0.14);
-    blob(g, 0, -0.95 * R, 0.5 * R, 0.2 * R, "150,160,150", 0.3);   // the cool grey-green north polar cap
   } else {   // Rahu and Ketu: the two eclipse points. No body and no light, so a dark disc with a rim of light
     disc(g, R, [[0, "#1D1840"], [0.7, "#130F2C"], [1, "#0B0920"]]);
     const rim = b === "Rahu" ? "176,152,255" : "222,160,174";
@@ -656,17 +638,10 @@ function paintLook(b) {
   g.restore();
   return c;
 }
-function paintRings() {   // Saturn's rings seen face-on; squashed by the real ring tilt when drawn
-  const n = 400, c = document.createElement("canvas"); c.width = c.height = n; const g = c.getContext("2d"), h = n / 2;
-  const gr = g.createRadialGradient(h, h, 0, h, h, h), C = "176,158,128", B = "238,222,188", Aa = "212,194,158";
-  for (const [f, col, a] of [[0, C, 0], [0.545, C, 0], [0.552, C, 0.16], [0.668, C, 0.3], [0.676, B, 0.82], [0.8, B, 0.95], [0.852, B, 0.72], [0.86, B, 0.04],
-    [0.89, Aa, 0.04], [0.898, Aa, 0.7], [0.962, Aa, 0.6], [0.968, Aa, 0.15], [0.975, Aa, 0.55], [0.994, Aa, 0.45], [1, Aa, 0]]) gr.addColorStop(f, `rgba(${col},${a})`);
-  g.fillStyle = gr; g.fillRect(0, 0, n, n); return c;
-}
-const LOOK = {}; for (const b of PLANETS) LOOK[b] = paintLook(b);
-const RINGS = paintRings(), RING_OUT = 2.27;   // outer edge of the A ring in Saturn radii
+const FLAT = new Set(["Mars", "Jupiter", "Saturn"]);   // these keep the original flat colour discs
+const LOOK = {}; for (const b of PLANETS) if (!FLAT.has(b)) LOOK[b] = paintLook(b);
 const SHEEN = (() => { const c = document.createElement("canvas"); c.width = c.height = 64; const g = c.getContext("2d"), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, "rgba(255,255,255,.22)"); gr.addColorStop(1, "rgba(255,255,255,0)"); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); return c; })();
-const LOOK_URL = {}; for (const b of PLANETS) { const c = document.createElement("canvas"); c.width = c.height = 40; c.getContext("2d").drawImage(LOOK[b], 0, 0, 40, 40); LOOK_URL[b] = c.toDataURL(); }
+const LOOK_URL = {}; for (const b of PLANETS) { if (FLAT.has(b)) continue; const c = document.createElement("canvas"); c.width = c.height = 40; c.getContext("2d").drawImage(LOOK[b], 0, 0, 40, 40); LOOK_URL[b] = c.toDataURL(); }
 
 /* How strongly each body glows comes from its real apparent magnitude, worked out live (smaller = brighter).
    Typical range: Venus −4.9 to −3.8, Jupiter −2.9 to −1.6, Mars −2.9 to +1.8, Mercury −2.5 to +5.7,
@@ -678,7 +653,8 @@ function glowStrength(b, mag) {
   if (b === "Moon") return clamp((-3 - mag) / 9.7, 0.12, 1);
   return clamp((1.6 - mag) / 6.5, 0.06, 1);
 }
-const BREATH = {Sun: [9000, 0], Moon: [8000, 1.3], Mercury: [4700, 2.1], Venus: [5300, 0.4], Mars: [5900, 3.3], Jupiter: [6400, 4.6], Saturn: [7100, 5.4]};
+// pulse length (ms) and a starting offset for each body, so they do not pulse in step
+const BREATH = {Sun: [5200, 0], Moon: [4600, 1.3], Mercury: [3300, 2.1], Venus: [3800, 0.4], Mars: [3500, 3.3], Jupiter: [4200, 4.6], Saturn: [4900, 5.4], Rahu: [4400, 2.8], Ketu: [4700, 0.9]};
 
 function auroraSprite(base, top) {
   const c = document.createElement("canvas"); c.width = 8; c.height = 256; const g = c.getContext("2d");
@@ -804,32 +780,45 @@ function text(ctx, s, x, y, color, font, align = "center") {
 }
 function alongBand(lon) { const a = pECL(lon - 1, 0), b = pECL(lon + 1, 0); if (!a || !b) return null; let ang = Math.atan2(b[1] - a[1], b[0] - a[0]), flip = false; if (ang > Math.PI / 2) { ang -= Math.PI; flip = true; } if (ang < -Math.PI / 2) { ang += Math.PI; flip = true; } return {ang, flip}; }
 
+// one ray of the aurora curtain at position u (degrees along it) and time t: brightness, height and lean
+function auroraRay(u, t, L) {
+  const n1 = 0.5 + 0.5 * Math.sin(u * 0.07 + t * 0.00021 + L * 1.7);
+  const n2 = 0.5 + 0.5 * Math.sin(u * 0.023 - t * 0.00013 + L * 0.9);
+  const n3 = 0.5 + 0.5 * Math.sin(u * 0.31 + t * 0.0009 + L * 2.3);
+  const wave = 0.5 + 0.5 * Math.sin(u * 0.045 - t * 0.0006 + L * 2.0);   // a brighter patch drifting along the curtain, about 10 s a wave
+  const ray = 0.76 + 0.24 * Math.sin(u * 1.1 + t * 0.0016 + 2 * Math.sin(u * 0.2 + t * 0.0004));   // fine rays rippling through it
+  const fold = Math.sin(u * 0.12 + t * 0.00055 + 1.5 * Math.sin(t * 0.00017 + u * 0.03));   // the folds rise and fall slowly
+  return {bright: (0.25 + 0.75 * n2) * (0.55 + 0.45 * n3) * (0.55 + 0.75 * wave) * ray, height: n1 * n2, n3, fold, lean: Math.sin(t * 0.00028 + u * 0.04 + L)};
+}
+function drawRay(ctx, L, bx, by, tx, ty, w, alpha) {
+  const dx = tx - bx, dy = ty - by, len = Math.hypot(dx, dy); if (len < 2) return;
+  ctx.globalAlpha = alpha; const ang = Math.atan2(dx, -dy), c = Math.cos(ang), s = Math.sin(ang);
+  ctx.setTransform(dpr * c, dpr * s, -dpr * s, dpr * c, dpr * bx, dpr * by);
+  ctx.drawImage(AUR[L], -w / 2, -len, w, len);
+}
 function drawAurora(ctx, t) {
   if (!layers.aurora) return;
-  const tt = REDUCED ? 0 : t;
-  const strength = (1 - dayFactor()) * (1 - hvAmt) * (0.82 + 0.18 * Math.sin(tt * 0.00035)); if (strength <= 0.02) return;   // the whole display breathes, about 18 s
-  const span = Math.min(180, view.fov * 0.95 + 25), step = Math.max(0.55, view.fov / 150);
+  const night = 1 - dayFactor(), breathe = 0.82 + 0.18 * Math.sin(t * 0.00035);   // the whole display breathes, about 18 s
   ctx.globalCompositeOperation = "lighter";
-  for (let L = 0; L < 2; L++) {
-    for (let d = -span; d <= span; d += step) {
-      const az = view.az + d;
-      const n1 = 0.5 + 0.5 * Math.sin(az * 0.07 + tt * 0.00021 + L * 1.7);
-      const n2 = 0.5 + 0.5 * Math.sin(az * 0.023 - tt * 0.00013 + L * 0.9);
-      const n3 = 0.5 + 0.5 * Math.sin(az * 0.31 + tt * 0.0009 + L * 2.3);
-      const wave = 0.5 + 0.5 * Math.sin(az * 0.045 - tt * 0.0006 + L * 2.0);   // a brighter patch drifting along the curtain, about 10 s a wave
-      const ray = 0.76 + 0.24 * Math.sin(az * 1.1 + tt * 0.0016 + 2 * Math.sin(az * 0.2 + tt * 0.0004));   // fine rays rippling through it
-      const fold = Math.sin(az * 0.12 + tt * 0.00055 + 1.5 * Math.sin(tt * 0.00017 + az * 0.03));   // the folds rise and fall slowly
-      const lean = 2.4 * Math.sin(tt * 0.00028 + az * 0.04 + L);   // rays lean gently one way, then the other
-      const top = 7.5 + 15 * n1 * n2 + 4 * n3 + 5 * fold + L * 3;
+  // sky view: curtains rising from the horizon
+  const sky = night * (1 - hvAmt) * breathe;
+  if (sky > 0.02) {
+    const span = Math.min(180, view.fov * 0.95 + 25), step = Math.max(0.55, view.fov / 150);
+    for (let L = 0; L < 2; L++) for (let d = -span; d <= span; d += step) {
+      const az = view.az + d, A = auroraRay(az, t, L), top = 7.5 + 15 * A.height + 4 * A.n3 + 5 * A.fold + L * 3;
       const b = pHOR(horFromAltAz(0.3 + 1.2 * L, az)); if (!b || b[0] < -60 || b[0] > W + 60) continue;
-      const tp = pHOR(horFromAltAz(top, az + lean)); if (!tp) continue;
+      const tp = pHOR(horFromAltAz(top, az + 2.4 * A.lean)); if (!tp) continue;
       const b2 = pHOR(horFromAltAz(0.3 + 1.2 * L, az + step)); if (!b2) continue;
-      const dx = tp[0] - b[0], dy = tp[1] - b[1], len = Math.hypot(dx, dy); if (len < 2) continue;
-      const w = Math.hypot(b2[0] - b[0], b2[1] - b[1]) * 1.9 + 1;
-      ctx.globalAlpha = (0.25 + 0.75 * n2) * (0.55 + 0.45 * n3) * (0.55 + 0.75 * wave) * ray * (L ? 0.11 : 0.15) * strength;
-      const ang = Math.atan2(dx, -dy), c = Math.cos(ang), s = Math.sin(ang);
-      ctx.setTransform(dpr * c, dpr * s, -dpr * s, dpr * c, dpr * b[0], dpr * b[1]);
-      ctx.drawImage(AUR[L], -w / 2, -len, w, len);
+      drawRay(ctx, L, b[0], b[1], tp[0], tp[1], Math.hypot(b2[0] - b[0], b2[1] - b[1]) * 1.9 + 1, A.bright * (L ? 0.11 : 0.15) * sky);
+    }
+  }
+  // House view has no horizon, so the same curtain rises softly from the bottom of the screen
+  const hvs = night * hvAmt * breathe;
+  if (hvs > 0.02) {
+    const step = Math.max(3, W / 300);
+    for (let L = 0; L < 2; L++) for (let x = -24; x <= W + 24; x += step) {
+      const u = x / 5 + 40, A = auroraRay(u, t, L), h = H * (0.16 + 0.24 * A.height + 0.05 * A.n3 + 0.06 * A.fold + 0.05 * L);
+      drawRay(ctx, L, x, H + 6, x + 18 * A.lean, H + 6 - h, step * 1.9 + 1, A.bright * (L ? 0.12 : 0.17) * hvs);
     }
   }
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
@@ -856,34 +845,39 @@ function radiusOf(b, vec) {
 }
 // screen angle that turns a body's own "up" towards ecliptic north, so bands, poles and rings sit the right way
 function axisAt(lon, lat, p) { const q = pECL(lon, lat + 0.5); return q && p ? Math.atan2(q[1] - p[1], q[0] - p[0]) + Math.PI / 2 : 0; }
-function drawRingHalf(ctx, Ro, f, side, a) {   // side +1: the half below the globe's centre
-  ctx.save(); ctx.beginPath(); ctx.rect(-Ro - 2, side > 0 ? 0 : -Ro - 2, 2 * Ro + 4, Ro + 2); ctx.clip();
-  ctx.scale(1, f); ctx.globalAlpha = a; ctx.drawImage(RINGS, -Ro, -Ro, 2 * Ro, 2 * Ro); ctx.restore();
-}
-// Draw one body. opts: {alpha, birth, k (lit fraction), limb (screen angle towards the Sun), axis, tilt (Saturn's rings), mag, alt, t}
+// Draw one body. opts: {alpha, birth, k (lit fraction), limb (screen angle towards the Sun), axis, mag, alt, t}
 function drawBody(ctx, b, x, y, r, o) {
-  const a = o.alpha, node = b === "Rahu" || b === "Ketu";
-  // glow, from the live magnitude; the birth chart's faint planets keep a dim glow that does not move
-  if (!node) {
-    const s = o.birth ? 0.3 : glowStrength(b, o.mag ?? -2);
-    let breathe = 1, shimmer = 1;
-    if (!o.birth && !REDUCED && o.t !== undefined) {
-      const [per, ph] = BREATH[b]; breathe = 1 + 0.13 * Math.sin(o.t * 6.2832 / per + ph);
-      if (!hv && o.alt > -1 && o.alt < 10) shimmer = 1 + 0.1 * (1 - Math.max(0, o.alt) / 10) * (0.6 * Math.sin(o.t / 83 + ph * 7) + 0.4 * Math.sin(o.t / 47 + ph * 3));
-    }
-    const g = (b === "Sun" ? r * 4.8 : r * (1.5 + 2.8 * s)) * (1 + 0.3 * (breathe - 1));
+  const a = o.alpha, node = b === "Rahu" || b === "Ketu", flat = FLAT.has(b);
+  // glow: every body pulses slowly and clearly; how big and bright the glow gets follows its live brightness.
+  // The birth chart's faint planets keep a dim glow that does not move.
+  if (o.birth) { ctx.globalAlpha = a * 0.35; const g = r * (b === "Sun" ? 4.8 : 3.2); ctx.drawImage(GLOW[b], x - g, y - g, g * 2, g * 2); }
+  else {
+    const s = 0.35 + 0.65 * (node ? 0.35 : glowStrength(b, o.mag ?? -2));
+    const [per, ph] = BREATH[b], q = o.t === undefined ? 0.5 : 0.5 + 0.5 * Math.sin(o.t * 6.2832 / per + ph), pe = q * q * (3 - 2 * q);
+    let shimmer = 1;
+    if (o.t !== undefined && !hv && o.alt > -1 && o.alt < 10) shimmer = 1 + 0.12 * (1 - Math.max(0, o.alt) / 10) * (0.6 * Math.sin(o.t / 83 + ph * 7) + 0.4 * Math.sin(o.t / 47 + ph * 3));
+    const g = (b === "Sun" ? r * 4.8 : r * (2 + 3.2 * s)) * (0.82 + 0.4 * pe);
     ctx.globalCompositeOperation = "lighter";
-    ctx.globalAlpha = a * (o.birth ? 0.3 : b === "Sun" ? 0.8 : 0.14 + 0.56 * s) * breathe * shimmer;
+    ctx.globalAlpha = a * Math.min(1, (b === "Sun" ? 0.7 : 0.22 + 0.62 * s) * (0.45 + 0.8 * pe) * shimmer);
     ctx.drawImage(GLOW[b], x - g, y - g, g * 2, g * 2);
+    const c = r * (1.9 + 0.5 * pe);   // a tight bright halo close to the disc that swells with the pulse
+    ctx.globalAlpha = a * Math.min(1, (0.15 + 0.45 * pe) * s);
+    ctx.drawImage(GLOW[b], x - c, y - c, c * 2, c * 2);
     ctx.globalCompositeOperation = "source-over";
-  } else { ctx.globalAlpha = a * 0.3; const g = r * 2.2; ctx.drawImage(GLOW[b], x - g, y - g, g * 2, g * 2); }   // only enough halo to find them
-  const tilt = o.tilt || 0, ring = b === "Saturn" ? Math.max(Math.abs(Math.sin(tilt * DEG)), 0.1) : 0, front = tilt >= 0 ? 1 : -1, Ro = r * RING_OUT;
-  ctx.save(); ctx.translate(x, y); ctx.rotate(o.axis || 0);
-  if (ring) drawRingHalf(ctx, Ro, ring, -front, a * 0.95);   // far half of the rings, behind the globe
-  ctx.globalAlpha = a; ctx.drawImage(LOOK[b], -r, -r, 2 * r, 2 * r);
-  ctx.restore();
-  // sunlight: a soft sheen on the sunward side, and the night side in shadow (so Venus, Mercury, Mars and the Moon show phases)
-  if (!node && b !== "Sun") {
+  }
+  if (flat) {   // Mars, Jupiter and Saturn: the original flat discs
+    const col = P[b].col;
+    if (b === "Saturn") { ctx.globalAlpha = a * 0.9; ctx.strokeStyle = "#CBD7FF"; ctx.lineWidth = Math.max(1.2, r * 0.22); ctx.beginPath(); ctx.ellipse(x, y, r * 1.95, r * 0.62, -0.38, Math.PI, 2 * Math.PI); ctx.stroke(); }
+    ctx.globalAlpha = a; ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, r, 0, 6.2832); ctx.fill();
+    if (b === "Jupiter" && r > 7) { ctx.save(); ctx.beginPath(); ctx.arc(x, y, r, 0, 6.2832); ctx.clip(); ctx.fillStyle = "rgba(160,96,30,.35)"; ctx.fillRect(x - r, y - r * 0.35, r * 2, r * 0.22); ctx.fillRect(x - r, y + r * 0.18, r * 2, r * 0.18); ctx.restore(); }
+    if (b === "Saturn") { ctx.globalAlpha = a * 0.95; ctx.beginPath(); ctx.ellipse(x, y, r * 1.95, r * 0.62, -0.38, 0, Math.PI); ctx.stroke(); }
+  } else {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(o.axis || 0);
+    ctx.globalAlpha = a; ctx.drawImage(LOOK[b], -r, -r, 2 * r, 2 * r);
+    ctx.restore();
+  }
+  // sunlight on the painted bodies: a soft sheen on the sunward side, and the night side in shadow (so the Moon, Venus and Mercury show phases)
+  if (!node && !flat && b !== "Sun") {
     ctx.save(); ctx.translate(x, y); ctx.rotate(o.limb || 0);
     ctx.beginPath(); ctx.arc(0, 0, r + 0.4, 0, 6.2832); ctx.clip();
     ctx.globalAlpha = a; ctx.drawImage(SHEEN, r * 0.3 - r * 0.95, -r * 0.95, r * 1.9, r * 1.9);
@@ -897,7 +891,6 @@ function drawBody(ctx, b, x, y, r, o) {
     }
     ctx.restore();
   }
-  if (ring) { ctx.save(); ctx.translate(x, y); ctx.rotate(o.axis || 0); drawRingHalf(ctx, Ro, ring, front, a * 0.95); ctx.restore(); }   // near half, in front
   if (o.birth) { ctx.globalAlpha = 0.6; ctx.strokeStyle = `rgba(${P[b].rgb},.9)`; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x, y, r + 1.5, 0, 6.2832); ctx.stroke(); }
   ctx.globalAlpha = 1;
 }
@@ -981,7 +974,7 @@ function drawOverlay(t) {
       const n = natal[b], v = eclToEQJ(F, n.lon, n.lat), q = pEQJ(v); natalXY[b] = q; if (!onScreen(q, 60)) continue;
       const r = radiusOf(b, b === "Sun" || b === "Moon" ? null : v);
       const il = natal.ill[b] || {};
-      drawBody(ctx, b, q[0], q[1], r, {alpha: 0.34, birth: true, k: il.k ?? 1, tilt: il.tilt, axis: axisAt(n.lon, n.lat || 0, q), limb: b === "Sun" ? 0 : limbAngle(v, eclToEQJ(F, natal.Sun.lon, 0))});
+      drawBody(ctx, b, q[0], q[1], r, {alpha: 0.34, birth: true, k: il.k ?? 1, axis: axisAt(n.lon, n.lat || 0, q), limb: b === "Sun" ? 0 : limbAngle(v, eclToEQJ(F, natal.Sun.lon, 0))});
       if (!under(mul(F.EQJ_HOR, v))) { const nk = nakOf(n.lon); hits.push({x: q[0], y: q[1], r: r + 5, prio: 1, html: `<b>Birth ${b}</b> (${esc(person.name)})<br>${dms(n.lon)} ${signFull(signOf(n.lon))}<br>${nk.name} pada ${nk.pada} · ${ord(((signOf(n.lon) - lagnaSign + 12) % 12) + 1)} house`}); }
     }
   }
@@ -1001,7 +994,7 @@ function drawOverlay(t) {
     const o = bodies[b], p = pEQJ(o.vec); if (!onScreen(p, 60)) continue;
     const r = radiusOf(b, o.vec), below = o.alt < -0.5;
     let alpha = jumpFade(b); if (below && !layers.ground && !hv) alpha *= 0.6;
-    drawBody(ctx, b, p[0], p[1], r, {alpha, k: o.k ?? 1, mag: o.mag, tilt: o.tilt, alt: o.alt, t, axis: axisAt(o.lon, o.lat || 0, p), limb: b === "Sun" ? 0 : limbAngle(o.vec, bodies.Sun.vec)});
+    drawBody(ctx, b, p[0], p[1], r, {alpha, k: o.k ?? 1, mag: o.mag, alt: o.alt, t, axis: axisAt(o.lon, o.lat || 0, p), limb: b === "Sun" ? 0 : limbAngle(o.vec, bodies.Sun.vec)});
     if (focus && focus.b === b && focus.kind === "now") { ctx.strokeStyle = "rgba(233,201,135,.8)"; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(p[0], p[1], r + 9, 0, 6.2832); ctx.stroke(); }
     if (!under(o.hor) || groundAlpha() < 0.95) {
       const nk = nakOf(o.lon), hl = ((signOf(o.lon) - lagnaSign + 12) % 12) + 1, hm = ((signOf(o.lon) - moonSign + 12) % 12) + 1;
@@ -1037,7 +1030,7 @@ function drawOverlay(t) {
 /* ---------------- planet index ---------------- */
 $("index").innerHTML = PLANETS.map(b => {
   const s = Math.round(clamp(P[b].r * 0.9, 7, 15)), node = b === "Rahu" || b === "Ketu";
-  return `<button class="chip" type="button" id="ix-${b}" data-b="${b}" aria-pressed="false" title="Turn the sky towards ${b}"><span class="d" style="width:${s}px;height:${s}px;background:${P[b].col} url(${LOOK_URL[b]}) center/cover"></span>${b}<span class="rx" hidden>R</span></button>`;
+  return `<button class="chip" type="button" id="ix-${b}" data-b="${b}" aria-pressed="false" title="Turn the sky towards ${b}"><span class="d" style="width:${s}px;height:${s}px;background:${P[b].col}${LOOK_URL[b] ? ` url(${LOOK_URL[b]}) center/cover` : ""}"></span>${b}<span class="rx" hidden>R</span></button>`;
 }).join("");
 $("index").addEventListener("click", e => {
   const c = e.target.closest(".chip"); if (!c) return; const b = c.dataset.b;
