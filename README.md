@@ -13,6 +13,10 @@ A live Vedic *gochar* (transit) sky that runs in your browser. It shows the real
 - **House view.** A fixed frame shows three houses at a time, level and upright, with arrows to move through all twelve. A card above it explains what each house signifies and what is happening in it now. Pinch out (or double-tap, or press +) to zoom into the centre house, where every degree and the nakshatras inside it are marked; pinch in to go back to three houses.
 - **Time travel.** Jump to any date and time and watch the sky glide there, or play time forward and backward with star trails.
 
+## Keyboard
+
+Like a game: hold **W A S D** (or the arrow keys) to look around and **Q / E** to zoom, with **Shift** to move faster. **1–9** jump to the Sun, Moon, Mars, Mercury, Jupiter, Venus, Saturn, Rahu and Ketu. **H** opens House view, where **A / D** step through the houses and **W / S** zoom into one house. **Space** pauses time, **[ ]** step a day (**Shift** for a year), **N** returns to now and **B** jumps to the birth moment. **F** opens Filters, **C** your chart, and **?** shows the full list.
+
 ## Privacy
 
 Birth details are saved only in your own browser (`localStorage`). They are never uploaded. When you search for a place, the place name is sent to the [Open-Meteo geocoding API](https://open-meteo.com/en/docs/geocoding-api) to find its coordinates and time zone. If that lookup is unavailable, a built-in list of cities is used instead.

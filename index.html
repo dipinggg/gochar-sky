@@ -66,6 +66,15 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 .modal .card{width:min(460px,100%);max-height:100%;overflow:auto;border-radius:16px;padding:18px 18px 16px;display:grid;gap:10px}
 .modal h2{font-family:var(--f-display);font-weight:400;letter-spacing:.14em;margin:0;font-size:1.3rem;color:var(--gold)}
 .modal .picked{color:var(--good);min-height:1em}
+kbd{display:inline-block;min-width:1.7em;padding:2px 6px;margin-right:3px;border:1px solid var(--edge-hi);border-bottom-width:2px;border-radius:6px;background:rgba(255,255,255,.06);font-family:var(--f-data);font-size:.74rem;line-height:1.3;text-align:center;color:var(--ink)}
+.modal .card.keyscard{width:min(720px,100%);gap:12px}
+.keyshead{display:flex;align-items:center;justify-content:space-between}
+.keysgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:6px 26px}
+.keysgrid h3{margin:6px 0 6px;font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.keysgrid dl{display:grid;grid-template-columns:auto 1fr;gap:7px 12px;margin:0;align-items:center}
+.keysgrid dt{white-space:nowrap} .keysgrid dd{margin:0;font-size:.82rem;color:var(--ink)}
+.linkbtn{display:inline-flex;align-items:center;gap:6px;margin-top:12px;background:none;border:0;padding:4px 0;color:var(--muted);font-size:.8rem;cursor:pointer}
+.linkbtn:hover{color:var(--ink)}
 .modal input[type=text],.modal input[type=date],.modal input[type=time]{padding:8px 10px;font-size:.92rem}
 .place{position:relative}
 .results{position:absolute;left:0;right:0;top:100%;margin-top:4px;z-index:9;background:var(--glass-hi);border:1px solid var(--edge);border-radius:10px;max-height:240px;overflow:auto;box-shadow:0 12px 32px rgba(0,0,0,.55)}
@@ -233,6 +242,7 @@ form.add{display:grid;gap:8px;margin-top:8px}
           <button type="button" data-lang="sa" aria-pressed="true">Sanskrit</button><button type="button" data-lang="en" aria-pressed="false">English</button>
         </div>
       </div>
+      <button class="linkbtn" type="button" id="keys-open"><kbd>?</kbd> Keyboard shortcuts</button>
     </div>
     <div class="tabpane" id="pane-c" role="tabpanel" aria-labelledby="tab-c" hidden>
       <section class="group">
@@ -296,6 +306,38 @@ form.add{display:grid;gap:8px;margin-top:8px}
   </div>
   <section class="hud hvinfo" id="hv-info" hidden aria-live="polite" aria-label="House insights"></section>
 
+  <div class="modal" id="keys" role="dialog" aria-modal="true" aria-labelledby="keys-title" hidden>
+    <div class="card glass keyscard">
+      <div class="keyshead"><h2 id="keys-title">Keyboard</h2><button class="btn" type="button" id="keys-close" aria-label="Close">Close</button></div>
+      <div class="keysgrid">
+        <section><h3>Look around</h3><dl>
+          <dt><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></dt><dd>Look up, left, down, right (hold). Arrow keys work too.</dd>
+          <dt><kbd>Q</kbd><kbd>E</kbd></dt><dd>Zoom out, zoom in (hold)</dd>
+          <dt><kbd>Shift</kbd></dt><dd>Hold to move faster</dd>
+          <dt><kbd>1</kbd>–<kbd>9</kbd></dt><dd>Go to Sun, Moon, Mars, Mercury, Jupiter, Venus, Saturn, Rahu, Ketu</dd>
+        </dl></section>
+        <section><h3>House view</h3><dl>
+          <dt><kbd>H</kbd></dt><dd>Open or close House view</dd>
+          <dt><kbd>A</kbd><kbd>D</kbd></dt><dd>Previous or next house (or ← →)</dd>
+          <dt><kbd>W</kbd><kbd>S</kbd></dt><dd>Zoom into one house, back to three</dd>
+          <dt><kbd>I</kbd></dt><dd>Show or hide insights</dd>
+          <dt><kbd>Esc</kbd></dt><dd>Zoom out, then back to the sky</dd>
+        </dl></section>
+        <section><h3>Time</h3><dl>
+          <dt><kbd>Space</kbd></dt><dd>Pause or play</dd>
+          <dt><kbd>[</kbd><kbd>]</kbd></dt><dd>One day back or forward</dd>
+          <dt><kbd>Shift</kbd>+<kbd>[</kbd><kbd>]</kbd></dt><dd>One year back or forward</dd>
+          <dt><kbd>N</kbd></dt><dd>Back to now</dd>
+          <dt><kbd>B</kbd></dt><dd>Birth moment</dd>
+        </dl></section>
+        <section><h3>Panels</h3><dl>
+          <dt><kbd>F</kbd></dt><dd>Open or close Filters</dd>
+          <dt><kbd>C</kbd></dt><dd>Your chart</dd>
+          <dt><kbd>?</kbd></dt><dd>Show this list</dd>
+        </dl></section>
+      </div>
+    </div>
+  </div>
   <div class="modal" id="onboard" role="dialog" aria-modal="true" aria-labelledby="ob-title" hidden>
     <form class="card glass" id="obform" novalidate>
       <h2 id="ob-title">Your Gochar Sky</h2>
@@ -1379,6 +1421,24 @@ function setInsights(on) { layers.insights = on; saveLayers(); markIns(); insKey
 $("hv-ins").addEventListener("click", () => setInsights(!layers.insights));
 
 let lastView = "";
+/* ---------------- keyboard: game-style looking around ----------------
+   Hold W A S D (or the arrows) to look around and Q / E to zoom; Shift moves faster. Movement eases in and out.
+   Keys go by their position on the keyboard, so WASD sits in the same place on any layout. */
+const held = new Set(); let keyShift = false, keyVel = {az: 0, alt: 0, zoom: 0};
+const LOOK_KEYS = {KeyW: "up", ArrowUp: "up", KeyS: "down", ArrowDown: "down", KeyA: "left", ArrowLeft: "left", KeyD: "right", ArrowRight: "right", KeyQ: "out", KeyE: "in"};
+const heldDir = d => { for (const c of held) if (LOOK_KEYS[c] === d) return 1; return 0; };
+function keyMove(dt) {
+  const sx = heldDir("right") - heldDir("left"), sy = heldDir("up") - heldDir("down"), sz = heldDir("in") - heldDir("out"), fast = keyShift ? 2.6 : 1;
+  const k = REDUCED ? 1 : 1 - Math.exp(-dt / 120);
+  keyVel.az += (sx * view.fov * 0.5 * fast / 1000 - keyVel.az) * k;
+  keyVel.alt += (sy * view.fov * 0.42 * fast / 1000 - keyVel.alt) * k;
+  keyVel.zoom += (sz * 0.0011 * fast - keyVel.zoom) * k;
+  if (Math.abs(keyVel.az) + Math.abs(keyVel.alt) > 1e-6) {
+    view.az = norm360(view.az + keyVel.az * dt / Math.max(0.35, Math.cos(view.alt * DEG)));   // same on-screen speed when looking up
+    view.alt += keyVel.alt * dt;
+  }
+  if (Math.abs(keyVel.zoom) > 1e-7) { zoomAnchor = null; view.fov = zoomTarget = clamp(view.fov * Math.exp(-keyVel.zoom * dt), 12, 175); }
+}
 function updateView(dt) {
   if (hv) { if (hv.mode !== "on" || hv.nav) { skyDirty = true; trailReset = true; } return; }   // house view drives the camera
   if (fly) {
@@ -1387,6 +1447,7 @@ function updateView(dt) {
     view.fov = fly.fov0 + (fly.fov1 - fly.fov0) * e; zoomTarget = view.fov;
     if (k >= 1) fly = null;
   } else {
+    keyMove(dt);
     if (!dragging && (Math.abs(vel.az) > 1e-5 || Math.abs(vel.alt) > 1e-5)) {
       view.az = norm360(view.az + vel.az * dt); view.alt += vel.alt * dt;
       const f = Math.exp(-dt / 320); vel.az *= f; vel.alt *= f;
@@ -1517,22 +1578,60 @@ ov.addEventListener("gesturechange", e => {
   else if (!hv) { fly = null; zoomAnchor = Number.isFinite(e.clientX) ? localXY(e) : [W / 2, H / 2]; zoomTarget = clamp(gz.fov / e.scale, 12, 175); }
 });
 ov.addEventListener("gestureend", e => { e.preventDefault(); if (gz && gz.hv && hv) hvZoomSettle(gz.z0); gz = null; });
+let hvKeyT = 0;
+function openKeys() { $("keys").hidden = false; setTimeout(() => $("keys-close").focus(), 20); }
+function closeKeys() { $("keys").hidden = true; }
+$("keys-open").addEventListener("click", openKeys);
+$("keys-close").addEventListener("click", closeKeys);
+$("keys").addEventListener("mousedown", e => { if (e.target === $("keys")) closeKeys(); });
+function keysTip() { if (!store.get("gocharsky.keysTip", false)) { store.set("gocharsky.keysTip", true); toast("Press ? for all keyboard shortcuts", 3200); } }
 window.addEventListener("keydown", e => {
-  if (e.target.closest("input,select,textarea")) return;
-  if (e.key === " " && !e.target.closest("button,a,summary") && !e.metaKey && !e.ctrlKey) { e.preventDefault(); togglePlay(); return; }
-  if (hv) {
-    if (e.key === "ArrowLeft") hvStep(1); else if (e.key === "ArrowRight") hvStep(-1);
-    else if (e.key === "+" || e.key === "=") hvZoomTo(1); else if (e.key === "-" || e.key === "_") hvZoomTo(0);
-    else if (e.key === "Escape") { if (hvZoomNow(performance.now()) > 0.5) hvZoomTo(0); else exitHV(); } else return;
+  if (e.target.closest("input,select,textarea") || !$("onboard").hidden) return;
+  if (e.metaKey || e.ctrlKey || e.altKey) return;   // leave browser shortcuts alone
+  keyShift = e.shiftKey;
+  if (!$("keys").hidden) { if (e.key === "Escape" || e.key === "?") { e.preventDefault(); closeKeys(); } return; }
+  if (e.key === "?") { e.preventDefault(); openKeys(); return; }
+  if (e.key === " ") { if (e.target.closest("button,a,summary")) return; e.preventDefault(); togglePlay(); return; }
+  const code = e.code, onBtn = e.target.closest("button,a,summary");
+  if (e.key === "Escape") {
+    if (hv) { if (hvZoomNow(performance.now()) > 0.5) hvZoomTo(0); else exitHV(); }
+    else if (!$("panel").hidden) setPanel(false); else if (focus) setFocus(null); else return;
     e.preventDefault(); return;
   }
-  if (e.target.closest("button")) return;
-  const step = view.fov / 10;
-  if (e.key === "ArrowLeft") vel.az = -step / 300; else if (e.key === "ArrowRight") vel.az = step / 300;
-  else if (e.key === "ArrowUp") vel.alt = step / 300; else if (e.key === "ArrowDown") vel.alt = -step / 300;
-  else if (e.key === "+" || e.key === "=") zoomAt([W / 2, H / 2], 0.8); else if (e.key === "-") zoomAt([W / 2, H / 2], 1.25);
+  // shortcuts that work everywhere
+  if (code === "KeyH") { $("houses").click(); e.preventDefault(); return; }
+  if (code === "KeyF") { setPanel($("panel").hidden); if (!$("panel").hidden) $("tab-f").click(); e.preventDefault(); return; }
+  if (code === "KeyC") { $("mychart").click(); e.preventDefault(); return; }
+  if (code === "KeyN") { $("now").click(); e.preventDefault(); return; }
+  if (code === "KeyB") { $("birthjump").click(); e.preventDefault(); return; }
+  if (code === "BracketLeft" || code === "BracketRight") {
+    const dir = code === "BracketRight" ? 1 : -1;
+    stepTo(e.shiftKey ? addYears(stepBase(), dir) : stepBase() + dir * DAY); e.preventDefault(); return;
+  }
+  if (/^Digit[1-9]$/.test(code)) { const b = PLANETS[+code.slice(5) - 1]; $("ix-" + b).click(); e.preventDefault(); return; }
+  if (hv) {   // House view: A/D or arrows step houses, W/S zoom one house, I toggles insights
+    if (code === "KeyI") { setInsights(!layers.insights); e.preventDefault(); return; }
+    const now = performance.now(), canStep = !e.repeat || now - hvKeyT > 420;
+    if (code === "KeyA" || code === "ArrowLeft") { if (canStep) { hvStep(1); hvKeyT = now; } }
+    else if (code === "KeyD" || code === "ArrowRight") { if (canStep) { hvStep(-1); hvKeyT = now; } }
+    else if (code === "KeyW" || code === "ArrowUp" || code === "KeyE" || e.key === "+" || e.key === "=") hvZoomTo(1);
+    else if (code === "KeyS" || code === "ArrowDown" || code === "KeyQ" || e.key === "-" || e.key === "_") hvZoomTo(0);
+    else return;
+    e.preventDefault(); return;
+  }
+  // sky view: hold to look around and zoom
+  if (LOOK_KEYS[code]) {
+    if (onBtn && code.startsWith("Arrow") && onBtn.closest(".seg,[role=tablist]")) return;   // arrows inside button groups stay with them
+    held.add(code); fly = null; vel = {az: 0, alt: 0}; if (focus) setFocus(null); $("tip").hidden = true;
+    if (code.startsWith("Key")) keysTip();
+    e.preventDefault(); return;
+  }
+  if (e.key === "+" || e.key === "=") zoomAt([W / 2, H / 2], 0.8); else if (e.key === "-" || e.key === "_") zoomAt([W / 2, H / 2], 1.25);
   else return; e.preventDefault(); if (focus) setFocus(null);
 });
+window.addEventListener("keyup", e => { held.delete(e.code); keyShift = e.shiftKey; });
+window.addEventListener("blur", () => { held.clear(); keyShift = false; });
+document.addEventListener("visibilitychange", () => { if (document.hidden) held.clear(); });
 function showTip(x, y, tap) {
   let best = null, bd = 1e9;
   for (const h of hits) { const d = Math.hypot(h.x - x, h.y - y) - (h.prio || 0) * 3; if (d < h.r + (tap ? 10 : 3) && d < bd) { bd = d; best = h; } }
