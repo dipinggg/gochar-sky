@@ -816,7 +816,7 @@ function drawAurora(ctx, t) {
   // House view has no horizon, so the same curtain rises softly from the bottom of the screen
   const hvs = night * hvAmt * breathe;
   if (hvs > 0.02) {
-    const step = Math.max(3, W / 300);
+    const step = Math.max(6, W / 200);
     for (let L = 0; L < 2; L++) for (let x = -24; x <= W + 24; x += step) {
       const u = x / 5 + 40, A = auroraRay(u, t, L), h = H * (0.16 + 0.24 * A.height + 0.05 * A.n3 + 0.06 * A.fold + 0.05 * L);
       drawRay(ctx, L, x, H + 6, x + 18 * A.lean, H + 6 - h, step * 1.9 + 1, A.bright * (L ? 0.12 : 0.17) * hvs);
@@ -1371,7 +1371,7 @@ function updateView(dt) {
 }
 
 /* ---------------- gestures ---------------- */
-const ptrs = new Map(); let gesture = null, samples = [], lastTap = 0, lastTapXY = [0, 0], moved = 0, hvWheel = {acc: 0, t: 0, last: 0};
+const ptrs = new Map(); let gesture = null, samples = [], lastTap = 0, lastTapXY = [0, 0], moved = 0, hvWheel = {acc: 0, last: 0, lock: false, t: 0, low: 0, prev: 0};
 function localXY(e) { const r = ov.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
 function grabPan(p0, p1) {
   const a0 = lookUnder(p0[0], p0[1]), a1 = lookUnder(p1[0], p1[1]);
@@ -1383,7 +1383,7 @@ ov.addEventListener("pointerdown", e => {
   ov.setPointerCapture(e.pointerId); const p = localXY(e); ptrs.set(e.pointerId, p);
   fly = null; vel = {az: 0, alt: 0}; zoomAnchor = null; zoomTarget = view.fov; samples = []; moved = 0;
   if (hv) {
-    if (ptrs.size === 1) gesture = {type: "hv", x0: p[0], steps: 0};
+    if (ptrs.size === 1) gesture = {type: "hv", x0: p[0], y0: p[1], stepped: false};
     else if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; gesture = {type: "hvpinch", d: Math.max(20, Math.hypot(a[0] - b[0], a[1] - b[1])), z0: hvZoomNow(performance.now())}; $("tip").hidden = true; }
     return;
   }
@@ -1399,11 +1399,10 @@ ov.addEventListener("pointermove", e => {
     if (ptrs.size >= 2 && !gesture.done) { const [a, b] = [...ptrs.values()]; hvZoomSet(gesture.z0 + Math.log(Math.hypot(a[0] - b[0], a[1] - b[1]) / gesture.d) / Math.log(1.9)); }
     return;
   }
-  if (gesture && gesture.type === "hv") {   // swipe right: the house on the left slides in; one house per 90 px
+  if (gesture && gesture.type === "hv") {   // one swipe = one house: right brings in the house on the left, left the one on the right
     if (moved > 4) $("tip").hidden = true;
-    const want = Math.trunc((p[0] - gesture.x0) / 90);
-    while (gesture.steps < want) { hvStep(1); gesture.steps++; }
-    while (gesture.steps > want) { hvStep(-1); gesture.steps--; }
+    const dx = p[0] - gesture.x0, dy = p[1] - gesture.y0;
+    if (!gesture.stepped && Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) { hvStep(dx > 0 ? 1 : -1); gesture.stepped = true; }
     return;
   }
   if (gesture && gesture.type === "pinch" && ptrs.size >= 2) {
@@ -1459,10 +1458,17 @@ ov.addEventListener("wheel", e => {
       hvWheelZ.timer = setTimeout(() => { const g = hvWheelZ; hvWheelZ = null; if (g) hvZoomSettle(g.z0); }, 170);
       return;
     }
-    // two-finger sideways swipe steps one house at a time
-    const now = performance.now(); if (now - hvWheel.last > 250) hvWheel.acc = 0; hvWheel.last = now;
-    hvWheel.acc += -e.deltaX * m;
-    if (Math.abs(hvWheel.acc) > 110 && now - hvWheel.t > 380) { hvStep(hvWheel.acc > 0 ? 1 : -1); hvWheel.acc = 0; hvWheel.t = now; }
+    // two-finger sideways swipe: one house per swipe. A trackpad keeps sending fading "momentum" events after the
+    // fingers lift, so after a step the swipe stays used up until the events stop (or a fresh swipe clearly starts).
+    const now = performance.now(), dx = Math.abs(e.deltaX * m), gap = now - hvWheel.last; hvWheel.last = now;
+    if (hvWheel.lock) {
+      hvWheel.low = Math.min(hvWheel.low, dx);
+      const since = now - hvWheel.t;
+      const fresh = since > 280 && dx > 6 && dx > hvWheel.prev * 1.8 && hvWheel.prev <= hvWheel.low * 1.5 + 1;   // speeding up again after slowing down
+      if ((gap > 300 && since > 250) || fresh) { hvWheel.lock = false; hvWheel.acc = 0; } else { hvWheel.prev = dx; return; }
+    } else if (gap > 250) hvWheel.acc = 0;
+    hvWheel.prev = dx; hvWheel.acc += -e.deltaX * m;
+    if (Math.abs(hvWheel.acc) > 60) { hvStep(hvWheel.acc > 0 ? 1 : -1); hvWheel.acc = 0; hvWheel.t = now; hvWheel.lock = true; hvWheel.low = dx; }
     return;
   }
   zoomAt(p, Math.exp(clamp(e.deltaY * m, -200, 200) * 0.0016));
