@@ -730,6 +730,15 @@ function paintGradient(ctx, alpha) {
   const stops = [[0, "03041A", "163F86"], [0.5, "0B0C33", "2A5DAE"], [0.78, "17154B", "4E86CF"], [0.93, "2C2474", "7DADE3"], [1, "40308A", "A9CBEE"]];
   for (const [o, n, dcol] of stops) { const c = mixHex(n, dcol, day); g.addColorStop(o, `rgba(${c.join(",")},${alpha})`); }
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  const dome = clamp((view.alt - 30) / 35, 0, 1), pZ = pHOR([0, 0, 1]);
+  if (dome > 0 && pZ && !hv) {
+    let r = 0, m = 0; for (const az of [0, 90, 180, 270]) { const q = pHOR(horFromAltAz(0, view.az + az)); if (q) { r += Math.hypot(q[0] - pZ[0], q[1] - pZ[1]); m++; } }
+    if (m) {
+      const rg = ctx.createRadialGradient(pZ[0], pZ[1], 0, pZ[0], pZ[1], r / m);
+      for (const [o, n, dcol] of stops) { const c = mixHex(n, dcol, day); rg.addColorStop(o, `rgba(${c.join(",")},${alpha * dome})`); }
+      ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H);
+    }
+  }
   return day;
 }
 function trailsActive() { return layers.trails && !hv && !dragging && !jump && !live && Math.abs(rate) >= 3600; }
@@ -1006,14 +1015,27 @@ function drawOverlay(t) {
   // ground (translucent when you look down, so planets below can be seen)
   if (layers.ground && hvAmt < 0.98) {
     const ga = groundAlpha() * (1 - hvAmt), day = dayFactor();
+    /* The skyline is traced all the way round. Looking up far enough, the whole horizon fits on screen as a closed
+       ring and the ground is everything outside it (looking down, everything inside). Otherwise part of the horizon is
+       behind you, and the visible stretch is closed off below the screen. */
     const drawDune = (fn, top, edge) => {
-      const pts = []; const st = view.fov < 60 ? 0.5 : 1.5; for (let d = -150; d <= 150; d += st) { const az = view.az + d; pts.push(pHOR(horFromAltAz(fn(norm360(az)), az))); }
-      const ok = pts.filter(Boolean); if (ok.length < 2) return;
-      const ys = ok.map(p => p[1]); const gtop = Math.min(...ys);
-      const g = ctx.createLinearGradient(0, gtop, 0, H); g.addColorStop(0, top); g.addColorStop(1, "#020309");
-      ctx.globalAlpha = ga; ctx.beginPath(); ctx.moveTo(ok[0][0], ok[0][1]); for (const p of ok) ctx.lineTo(p[0], p[1]);
-      ctx.lineTo(ok[ok.length - 1][0], H + 2000); ctx.lineTo(ok[0][0], H + 2000); ctx.closePath(); ctx.fillStyle = g; ctx.fill();
-      ctx.strokeStyle = edge; ctx.lineWidth = 1; ctx.beginPath(); ok.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.stroke(); ctx.globalAlpha = 1;
+      const st = view.fov < 60 ? 0.5 : 1.5, pts = [];
+      for (let d = -180; d < 180; d += st) { const az = view.az + d; pts.push(pHOR(horFromAltAz(fn(norm360(az)), az))); }
+      const n = pts.length, gaps = pts.some(p => !p);
+      let run = pts;
+      if (gaps) {   // longest unbroken stretch of skyline, starting just after a gap
+        const start = pts.findIndex((p, i) => p && !pts[(i - 1 + n) % n]); run = []; let best = [];
+        for (let k = 0; k < n; k++) { const p = pts[(start + k) % n]; if (p) run.push(p); else { if (run.length > best.length) best = run; run = []; } }
+        if (run.length > best.length) best = run; run = best;
+      }
+      if (run.length < 2) return;
+      const ys = run.map(p => p[1]), g = ctx.createLinearGradient(0, Math.max(-H, Math.min(...ys)), 0, H); g.addColorStop(0, top); g.addColorStop(1, "#020309");
+      ctx.globalAlpha = ga; ctx.beginPath();
+      if (!gaps && view.alt > 0) ctx.rect(-10, -10, W + 20, H + 20);   // ground outside the ring
+      ctx.moveTo(run[0][0], run[0][1]); for (const p of run) ctx.lineTo(p[0], p[1]);
+      if (gaps) { ctx.lineTo(run[run.length - 1][0], H + 2000); ctx.lineTo(run[0][0], H + 2000); }
+      ctx.closePath(); ctx.fillStyle = !gaps && view.alt > 0 ? top : g; ctx.fill("evenodd");
+      ctx.strokeStyle = edge; ctx.lineWidth = 1; ctx.beginPath(); run.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); if (!gaps) ctx.closePath(); ctx.stroke(); ctx.globalAlpha = 1;
     };
     const dune = az => { const z = az * DEG; return 0.9 + 1.4 * Math.max(0, Math.sin(2 * z + 0.7)) + 0.45 * Math.sin(5 * z + 1.9) + 0.2 * Math.sin(13 * z); };
     const near = az => { const z = az * DEG; return -1.2 + 4.2 * Math.max(0, Math.sin(z + 2.4)) + 0.6 * Math.sin(3 * z); };
