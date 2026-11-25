@@ -97,6 +97,23 @@ kbd{display:inline-block;min-width:1.7em;padding:2px 6px;margin-right:3px;border
 .hvi-head .sum{margin-left:auto;font-size:.74rem;color:var(--muted)}
 .hvi-sig{color:var(--muted);margin:3px 0 8px}
 .hvi-grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:6px 18px}
+.hvi-now{margin:0 0 9px;line-height:1.55;color:var(--ink)}
+.hvi-x{display:grid;place-items:center;width:26px;height:26px;padding:0;border:1px solid rgba(255,255,255,.14);border-radius:var(--rad-s);background:rgba(255,255,255,.04);color:var(--muted);cursor:pointer;align-self:center}
+.hvi-x:hover{color:var(--ink);border-color:rgba(255,255,255,.3)}
+.hvinfo.big{z-index:4;background:rgba(18,16,48,.86)}
+.hvi-head .verdict{margin-left:auto;font-size:.7rem;font-weight:700;letter-spacing:.04em;padding:1px 8px;border-radius:var(--rad-s);border:1px solid currentColor}
+.hvi-head .verdict.good{color:var(--good)} .hvi-head .verdict.bad{color:var(--warn)} .hvi-head .verdict.mixed{color:var(--gold)}
+.hvi-cols{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:4px 22px;align-items:start}
+.hvinfo details{border-top:1px solid rgba(255,255,255,.09);padding:5px 0}
+.hvinfo summary{cursor:pointer;list-style:none;display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}
+.hvinfo summary::-webkit-details-marker{display:none}
+.hvinfo summary::before{content:"›";display:inline-block;width:8px;color:var(--muted);transition:transform .2s}
+.hvinfo details[open]>summary::before{transform:rotate(90deg)}
+.hvinfo .rows{display:grid;grid-template-columns:auto minmax(0,1fr);gap:5px 12px;margin:6px 0 4px 14px}
+.hvinfo .rows dt{color:var(--muted);font-size:.7rem;letter-spacing:.02em;white-space:nowrap;padding-top:1px}
+.hvinfo .rows dd{margin:0}
+.hvinfo details ul{margin:6px 0 2px 14px}
+.hvi-foot{color:var(--faint);font-size:.68rem;margin:8px 0 0}
 .hvinfo ul{list-style:none;margin:0;padding:0;display:grid;gap:5px}
 .hvinfo li{min-width:0}
 .hvinfo .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:1px}
@@ -109,6 +126,7 @@ kbd{display:inline-block;min-width:1.7em;padding:2px 6px;margin-right:3px;border
 /* drawer */
 .panel{right:12px;top:66px;bottom:146px;width:300px;border-radius:var(--rad);display:flex;flex-direction:column;overflow:hidden;z-index:5}
 .panel[hidden]{display:none}
+[hidden]{display:none!important}
 .tabs{display:flex;gap:4px;padding:8px 8px 0}
 .tab{flex:1;padding:8px;border:0;border-radius:var(--rad-s) var(--rad-s) 0 0;background:transparent;color:var(--muted);font-weight:600;font-size:.84rem;cursor:pointer;border-bottom:2px solid transparent}
 .tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--gold)}
@@ -200,6 +218,8 @@ form.add{display:grid;gap:8px;margin-top:8px}
   .hvarrow span{font-size:1.7rem}
   .hvarrow small{font-size:.6rem}
   .hvi-grid{grid-template-columns:1fr}
+  .hvi-cols{grid-template-columns:1fr}
+  .hvinfo .rows{grid-template-columns:1fr;gap:1px;margin-left:12px} .hvinfo .rows dd{margin-bottom:5px}
   .hvi-side{flex-direction:column;gap:4px}
   .hvi-side .r{text-align:left}
 }
@@ -1347,17 +1367,7 @@ const HOUSES = [
   ["Karma bhava", "career, status, reputation, authority, public role"],
   ["Labha bhava", "gains, income, friends, networks, wishes fulfilled"],
   ["Vyaya bhava", "expenses, sleep, solitude, foreign lands, spirituality, letting go"]];
-function dignity(b, s) { if (!(b in EXALT)) return ""; if (EXALT[b] === s) return "exalted"; if ((EXALT[b] + 6) % 12 === s) return "debilitated"; if (OWN[b].includes(s)) return "own sign"; return ""; }
 const dot = b => `<span class="dot" style="background:${P[b].col}"></span>`;
-function aspectsOn(s) {
-  const out = [];
-  for (const b of PLANETS) {
-    if (b === "Rahu" || b === "Ketu") continue; const ps = signOf(bodies[b].lon); if (ps === s) continue;
-    const n = ((s - ps + 12) % 12) + 1;
-    if (n === 7 || (b === "Mars" && (n === 4 || n === 8)) || (b === "Jupiter" && (n === 5 || n === 9)) || (b === "Saturn" && (n === 3 || n === 10))) out.push(`${dot(b)}${b} <span class="m">(${ord(n)} aspect)</span>`);
-  }
-  return out;
-}
 const moonCache = {key: "", text: ""};
 function moonVisit(s, tp) {
   const key = s + ":" + Math.floor(tp / 1800000); if (moonCache.key === key) return moonCache.text;
@@ -1367,56 +1377,327 @@ function moonVisit(s, tp) {
   else { let t = tp; while (!inS(t) && t - tp < 30 * DAY) t += H2; txt = `The Moon next passes through from about ${fmtT(t, {day: "numeric", month: "short"})}, ${fmtT(t, {hour: "2-digit", minute: "2-digit", hour12: false})}.`; }
   moonCache.key = key; moonCache.text = txt; return txt;
 }
-function transitNotes(b, s) {
-  const notes = [], ms = signOf(natal.Moon.lon), n = ((s - ms + 12) % 12) + 1, o = bodies[b];
-  const good = GOOD_FROM_MOON[b].includes(n);
-  notes.push(`<span class="${good ? "good" : "bad"}">${good ? "Supportive" : "Testing"} from your Moon (${ord(n)})</span>`);
-  if (b === "Saturn") { const ph = {12: "Sade Sati, first phase", 1: "Sade Sati peak", 2: "Sade Sati, last phase", 8: "Ashtama Shani", 4: "Kantaka Shani"}[n]; if (ph) notes.push(`<span class="bad">${ph}</span>`); if (signOf(natal.Saturn.lon) === s) notes.push("Saturn return"); }
-  if (b === "Jupiter" && signOf(natal.Jupiter.lon) === s) notes.push(`<span class="good">Jupiter return</span>`);
-  if ((b === "Rahu" || b === "Ketu") && s === ms) notes.push(`<span class="bad">${b} on your Moon sign</span>`);
-  if ((b === "Rahu" || b === "Ketu") && s === signOf(natal.Asc.lon)) notes.push(`${b} on your Lagna sign`);
-  const dg = dignity(b, s); if (dg) notes.push(dg);
-  if (o.retro) notes.push("retrograde, so these themes get revisited");
-  for (const nb of ["Asc", ...PLANETS]) { if (b === "Moon") break; const d = sepLon(o.lon, natal[nb].lon); if (d <= 3) notes.push(`<span class="hit">${d.toFixed(1)}° from your birth ${nb === "Asc" ? "Lagna" : nb}</span>`); }
-  return notes.join(" · ");
-}
 function sideLine(s, arrow) {
   const now = PLANETS.filter(b => signOf(bodies[b].lon) === s), birth = PLANETS.filter(b => signOf(natal[b].lon) === s);
   const short = HOUSES[houseNo(s) - 1][1].split(", ").slice(0, 3).join(", ");
   const body = `<b>${houseNo(s)} · ${signName(s)}</b>: ${short}. Now: ${now.length ? now.map(b => dot(b) + b).join(", ") : "empty"}. Birth: ${birth.length ? birth.join(", ") : "none"}.`;
   return arrow === "l" ? `<span>‹ ${body}</span>` : `<span class="r">${body} ›</span>`;
 }
-function insightsHTML(s, tp) {
-  const h = houseNo(s), [bhava, sig] = HOUSES[h - 1], lagnaSign = signOf(natal.Asc.lon), ms = signOf(natal.Moon.lon);
-  const now = PLANETS.filter(b => signOf(bodies[b].lon) === s), asp = aspectsOn(s);
-  const summary = now.length ? `${now.length} planet${now.length > 1 ? "s" : ""} passing through` : "Quiet: no planet passing through";
-  const nowItems = now.map(b => { const o = bodies[b], nk = nakOf(o.lon); return `<li>${dot(b)}<b>${b}</b> <span class="m">${dms(o.lon)}${o.retro ? " R" : ""} · ${nk.name} ${nk.pada}</span><br>Brings ${NATURE[b]} to ${sig.split(", ").slice(0, 3).join(", ")}. ${transitNotes(b, s)}</li>`; });
-  if (!nowItems.length) nowItems.push(`<li class="m">No planet is in this house right now.</li>`);
-  if (asp.length) nowItems.push(`<li>Aspected by ${asp.join(", ")}</li>`);
-  nowItems.push(`<li class="m">${moonVisit(s, tp)}</li>`);
-  const birth = PLANETS.filter(b => signOf(natal[b].lon) === s).map(b => { const dg = dignity(b, s); return `${dot(b)}${b} <span class="m">${dms(natal[b].lon)}${dg ? ", " + dg : ""}</span>`; });
-  const lord = LORD[s], lN = ((signOf(natal[lord].lon) - lagnaSign + 12) % 12) + 1, lT = ((signOf(bodies[lord].lon) - lagnaSign + 12) % 12) + 1;
-  const birthItems = [
-    birth.length ? `<li>Born with ${birth.join(", ")} here.</li>` : `<li class="m">No birth planets here.</li>`,
-    signOf(natal.Asc.lon) === s ? `<li>This is your Lagna sign.</li>` : "",
-    `<li>Lord ${dot(lord)}<b>${lord}</b>: at birth in your ${ord(lN)} house (${signName(signOf(natal[lord].lon))}); now passing your ${ord(lT)} (${signName(signOf(bodies[lord].lon))})${bodies[lord].retro ? ", retrograde" : ""}.</li>`,
-    `<li class="m">This sign is ${ord(((s - ms + 12) % 12) + 1)} from your birth Moon.</li>`].join("");
-  return `<div class="hvi-head"><b>House ${h}</b><span>${signFull(s)}</span><span class="tag">${bhava}</span><span class="sum">${summary}</span></div>
-  <p class="hvi-sig">Signifies ${sig}.</p>
-  <div class="hvi-grid"><section><h3>At this moment</h3><ul>${nowItems.join("")}</ul></section><section><h3>In ${esc(person.name)}'s birth chart</h3><ul>${birthItems}</ul></section></div>
-  <div class="hvi-side">${sideLine((s + 1) % 12, "l")}${sideLine((s + 11) % 12, "r")}</div>`;
+/* ---------------- Vedic reading engine for the insights card ----------------
+   Classical rules used:
+   · Gochara (transit) results counted from the birth Moon, with vedha and vipareeta vedha (Phaladeepika, ch. 26)
+   · Ashtakavarga bindus per planet and per sign (Sarvashtakavarga), and kakshya sub-divisions (Brihat Parashara Hora Shastra)
+   · Dignity: exaltation, moolatrikona, own sign, natural friendship (BPHS)
+   · Combustion orbs (Surya Siddhanta) and planetary war within 1°
+   · Nakshatra lord, deity and nature (Muhurta texts); Tara bala counted from the birth star
+   · Vimshottari dasha from the birth Moon
+   Readings are short, plain-language summaries of the traditional meanings. */
+const SEVEN = ["Sun", "Moon", "Mars", "Mercury", "Jupiter", "Venus", "Saturn"];
+const FRIENDS = {Sun: {f: ["Moon", "Mars", "Jupiter"], e: ["Venus", "Saturn"]}, Moon: {f: ["Sun", "Mercury"], e: []}, Mars: {f: ["Sun", "Moon", "Jupiter"], e: ["Mercury"]},
+  Mercury: {f: ["Sun", "Venus"], e: ["Moon"]}, Jupiter: {f: ["Sun", "Moon", "Mars"], e: ["Mercury", "Venus"]}, Venus: {f: ["Mercury", "Saturn"], e: ["Sun", "Moon"]}, Saturn: {f: ["Mercury", "Venus"], e: ["Sun", "Moon", "Mars"]}};
+const MOOLA = {Sun: [4, 0, 20], Moon: [1, 3, 30], Mars: [0, 0, 12], Mercury: [5, 15, 20], Jupiter: [8, 0, 10], Venus: [6, 0, 15], Saturn: [10, 0, 20]};
+const NODE_EX = {Rahu: 1, Ketu: 7};
+function dignityOf(b, lon) {
+  const s = signOf(lon), d = norm360(lon) % 30;
+  if (b === "Rahu" || b === "Ketu") {
+    if (NODE_EX[b] === s) return {label: "exalted (by the common view)", score: 1};
+    if ((NODE_EX[b] + 6) % 12 === s) return {label: "debilitated (by the common view)", score: -1};
+    return {label: `in ${LORD[s]}'s sign`, score: 0};
+  }
+  if (EXALT[b] === s) return {label: "exalted", score: 1};
+  if ((EXALT[b] + 6) % 12 === s) return {label: "debilitated", score: -1};
+  const m = MOOLA[b]; if (m[0] === s && d >= m[1] && d < m[2]) return {label: "in its moolatrikona (its strongest home)", score: 1};
+  if (OWN[b].includes(s)) return {label: "in its own sign", score: 1};
+  const L = LORD[s], fr = FRIENDS[b];
+  if (fr.f.includes(L)) return {label: `in a friend's sign (${L})`, score: 0.5};
+  if (fr.e.includes(L)) return {label: `in an enemy's sign (${L})`, score: -0.5};
+  return {label: `in a neutral sign (${L})`, score: 0};
 }
+
+// Ashtakavarga: houses (counted from each contributor) where it gives the planet a bindu (BPHS)
+const AVT = {
+  Sun:     {Sun: [1,2,4,7,8,9,10,11], Moon: [3,6,10,11], Mars: [1,2,4,7,8,9,10,11], Mercury: [3,5,6,9,10,11,12], Jupiter: [5,6,9,11], Venus: [6,7,12], Saturn: [1,2,4,7,8,9,10,11], Asc: [3,4,6,10,11,12]},
+  Moon:    {Sun: [3,6,7,8,10,11], Moon: [1,3,6,7,10,11], Mars: [2,3,5,6,9,10,11], Mercury: [1,3,4,5,7,8,10,11], Jupiter: [1,4,7,8,10,11,12], Venus: [3,4,5,7,9,10,11], Saturn: [3,5,6,11], Asc: [3,6,10,11]},
+  Mars:    {Sun: [3,5,6,10,11], Moon: [3,6,11], Mars: [1,2,4,7,8,10,11], Mercury: [3,5,6,11], Jupiter: [6,10,11,12], Venus: [6,8,11,12], Saturn: [1,4,7,8,9,10,11], Asc: [1,3,6,10,11]},
+  Mercury: {Sun: [5,6,9,11,12], Moon: [2,4,6,8,10,11], Mars: [1,2,4,7,8,9,10,11], Mercury: [1,3,5,6,9,10,11,12], Jupiter: [6,8,11,12], Venus: [1,2,3,4,5,8,9,11], Saturn: [1,2,4,7,8,9,10,11], Asc: [1,2,4,6,8,10,11]},
+  Jupiter: {Sun: [1,2,3,4,7,8,9,10,11], Moon: [2,5,7,9,11], Mars: [1,2,4,7,8,10,11], Mercury: [1,2,4,5,6,9,10,11], Jupiter: [1,2,3,4,7,8,10,11], Venus: [2,5,6,9,10,11], Saturn: [3,5,6,12], Asc: [1,2,4,5,6,7,9,10,11]},
+  Venus:   {Sun: [8,11,12], Moon: [1,2,3,4,5,8,9,11,12], Mars: [3,5,6,9,11,12], Mercury: [3,5,6,9,11], Jupiter: [5,8,9,10,11], Venus: [1,2,3,4,5,8,9,10,11], Saturn: [3,4,5,8,9,10,11], Asc: [1,2,3,4,5,8,9,11]},
+  Saturn:  {Sun: [1,2,4,7,8,10,11], Moon: [3,6,11], Mars: [3,5,6,10,11,12], Mercury: [6,8,9,10,11,12], Jupiter: [5,6,11,12], Venus: [6,11,12], Saturn: [3,5,6,11], Asc: [1,3,4,6,10,11]}};
+let avCache = {key: ""};
+function ashtakavarga() {
+  const key = person.id + ":" + natal.birth + ":" + natal.Asc.lon.toFixed(3); if (avCache.key === key) return avCache;
+  const sg = {}; for (const c of [...SEVEN, "Asc"]) sg[c] = signOf(natal[c].lon);
+  const bav = {}, sav = new Array(12).fill(0);
+  for (const p of SEVEN) { bav[p] = new Array(12).fill(0); for (const c in AVT[p]) for (const h of AVT[p][c]) bav[p][(sg[c] + h - 1) % 12]++; for (let s = 0; s < 12; s++) sav[s] += bav[p][s]; }
+  avCache = {key, bav, sav, sg}; return avCache;
+}
+const KAKSHYA = ["Saturn", "Jupiter", "Mars", "Sun", "Venus", "Mercury", "Moon", "Asc"];   // eight 3°45′ strips of each sign
+function kakshyaOf(p, lon) {
+  const av = ashtakavarga(), s = signOf(lon), k = Math.floor((norm360(lon) % 30) / 3.75), lord = KAKSHYA[k];
+  return {lord: lord === "Asc" ? "Lagna" : lord, gave: AVT[p][lord].includes(((s - av.sg[lord] + 12) % 12) + 1), from: k * 3.75, to: (k + 1) * 3.75};
+}
+
+// vedha: a good transit (house from the Moon) is blocked by any planet in its vedha house; Sun–Saturn and Moon–Mercury never block each other
+const VEDHA = {Sun: {3:9, 6:12, 10:4, 11:5}, Moon: {1:5, 3:9, 6:12, 7:2, 10:4, 11:8}, Mars: {3:12, 6:9, 11:5}, Mercury: {2:5, 4:3, 6:9, 8:1, 10:8, 11:12},
+  Jupiter: {2:12, 5:4, 7:3, 9:10, 11:8}, Venus: {1:8, 2:7, 3:1, 4:10, 5:9, 8:5, 9:11, 11:3, 12:6}, Saturn: {3:12, 6:9, 11:5}};
+VEDHA.Rahu = VEDHA.Saturn; VEDHA.Ketu = VEDHA.Saturn;
+const NO_VEDHA = {Sun: "Saturn", Saturn: "Sun", Moon: "Mercury", Mercury: "Moon", Rahu: "Ketu", Ketu: "Rahu"};
+const fromMoon = lon => ((signOf(lon) - signOf(natal.Moon.lon) + 12) % 12) + 1;
+function vedhaOf(b) {
+  const n = fromMoon(bodies[b].lon), V = VEDHA[b], good = GOOD_FROM_MOON[b].includes(n);
+  const at = h => PLANETS.filter(x => x !== b && NO_VEDHA[b] !== x && fromMoon(bodies[x].lon) === h);
+  if (good) return {n, good, vh: V[n], blocked: V[n] ? at(V[n]) : []};
+  const g = Object.keys(V).find(k => V[k] === n);
+  return {n, good, vh: g ? +g : 0, eased: g ? at(+g) : []};
+}
+
+// classical transit results by house counted from the birth Moon (after Phaladeepika ch. 26), in plain words
+const GOCHARA = {
+  Sun: ["tiredness, a short temper, and strain from travel or health", "money worries, eye strain, and people who may mislead you", "gains, a better position, good health; rivals fade", "unease at home, family friction, and strain on the heart and chest", "worry and muddled thinking; concern for children", "wins over rivals; illness eases; success", "tiring travel, stomach upsets, and a dent to your standing", "fear, illness, quarrels, and trouble from people in authority", "setbacks, low spirits, and distance from elders", "success at work, recognition, and tasks finished", "gains, promotion, honour, and good health", "spending, quarrels, and fatigue"],
+  Moon: ["comfort, good food, and a pleasant mood", "small losses or costs and minor hurdles", "gains, success, and a cheerful mood", "unease, worry, and some distrust", "a low mood; plans stall", "health and money improve; opponents go quiet", "affection, good company, and comfort", "worry, fear, and small health dips", "obstacles, delays, and tiredness", "work goes well; you are noticed", "gains, happy news, and friends", "expenses, sadness, and poor sleep"],
+  Mars: ["anger, fevers, and the risk of cuts or burns; friction", "money loss, harsh words, and family tension", "courage, wins over rivals, and gains", "trouble at home or over property; stomach or chest strain", "anger, poor judgment, and worry about children", "victory, better health, debts cleared, and rivals beaten", "friction with your partner; eye or stomach trouble", "accidents, fevers, and sudden losses; take extra care", "setbacks, weakness, and loss of face", "hard effort at work, mixed with obstacles", "gains, property, good health, and success", "expenses, losses, and conflicts"],
+  Mercury: ["losses through bad advice, and sharp words", "money gains and well-chosen words", "fear of rivals and tension with friends", "family happiness, comforts, and gains", "quarrels with children or partner; a restless mind", "success, a rise in position; rivals lose ground", "quarrels and small health worries", "gains, success, and happiness through children", "obstacles and delays", "success in work and praise", "gains, happiness, and good news", "losses, insults, and expenses"],
+  Jupiter: ["a change of place, costs, and a wobble in position", "more money, family harmony, and kind speech", "obstacles and setbacks in position", "trouble from relatives and unease at home", "wisdom, good decisions, romance, and joy through children", "trouble from rivals and health worries", "blessings for marriage and partnerships; comforts", "obstacles, illness, and loss", "fortune, spiritual growth, and help from elders and teachers", "pressure at work and strain on money or health", "gains, promotion, and wishes fulfilled", "travel, costs, and some sorrow"],
+  Venus: ["comforts, pleasures, and romance", "money, family happiness, and gifts", "success, position, and gains", "friends, comforts, and happiness at home", "joy, help from elders, and happiness through children", "troubles, quarrels, and loss of face", "trouble in love or with your partner", "wealth and comforts", "good fortune, gifts, and blessings", "quarrels and discontent at work", "gains, prosperity, and friends", "wealth and comforts, with some spending"],
+  Saturn: ["the peak of Sade Sati: fatigue, health strain, losses, and heavy duties", "the last phase of Sade Sati: money strain, family friction, and harsh words", "gains, recovery, and help from others; success", "Kantaka Shani: an unsettled home and mind; property or vehicle trouble", "worry about children and a confused mind", "victory over rivals, health, and gains", "travel, strain in partnerships, and health care needed", "Ashtama Shani: obstacles, chronic strain, and fears; go carefully", "setbacks in luck and concern for your father", "work pressure and career setbacks", "gains, income, success, and recognition", "the first phase of Sade Sati: spending, poor sleep, and loss of comfort"],
+  Rahu: ["confusion and health worries", "money leaks, family tension, and careless words", "courage, success, and gains", "unrest at home", "an anxious mind and worry about children", "victory over rivals and better health", "illusions or strain in relationships", "sudden troubles and hidden fears", "doubts and setbacks in luck", "restless ambition and instability at work", "gains and sudden wins", "expenses, poor sleep, and foreign links"],
+  Ketu: ["detachment and dips in health", "distance in the family and trouble with speech", "courage and gains", "restlessness at home", "a confused mind", "victory and healing", "distance in partnerships", "sudden setbacks and a spiritual turn", "doubts about beliefs and teachers", "lack of direction at work", "gains, including spiritual ones", "spiritual growth, withdrawal, and some losses"]};
+
+// nakshatra: lord, deity, nature (Muhurta classification)
+const NAKX = [["Ketu", "the Ashwini twins", "Kshipra"], ["Venus", "Yama", "Ugra"], ["Sun", "Agni", "Mishra"], ["Moon", "Brahma", "Dhruva"], ["Mars", "Soma", "Mridu"], ["Rahu", "Rudra", "Tikshna"],
+  ["Jupiter", "Aditi", "Chara"], ["Saturn", "Brihaspati", "Kshipra"], ["Mercury", "the Nagas", "Tikshna"], ["Ketu", "the Pitrs (ancestors)", "Ugra"], ["Venus", "Bhaga", "Ugra"], ["Sun", "Aryaman", "Dhruva"],
+  ["Moon", "Savitr", "Kshipra"], ["Mars", "Vishvakarma", "Mridu"], ["Rahu", "Vayu", "Chara"], ["Jupiter", "Indra and Agni", "Mishra"], ["Saturn", "Mitra", "Mridu"], ["Mercury", "Indra", "Tikshna"],
+  ["Ketu", "Nirriti", "Tikshna"], ["Venus", "the Waters", "Ugra"], ["Sun", "the Vishvadevas", "Dhruva"], ["Moon", "Vishnu", "Chara"], ["Mars", "the Vasus", "Chara"], ["Rahu", "Varuna", "Chara"],
+  ["Jupiter", "Aja Ekapada", "Ugra"], ["Saturn", "Ahir Budhnya", "Dhruva"], ["Mercury", "Pushan", "Mridu"]];
+const NAKTYPE = {Dhruva: "fixed (steady, lasting results)", Chara: "moving (change, travel, new starts)", Ugra: "fierce (intense, bold action)", Mishra: "mixed (both sharp and soft)",
+  Kshipra: "swift (quick results, healing, trade)", Mridu: "soft (gentle, creative, good for bonds)", Tikshna: "sharp (cutting through, endings, deep research)"};
+const TARA = [["Janma", "your own birth star: personal and mixed", ""], ["Sampat", "wealth: good", "good"], ["Vipat", "danger: obstacles", "bad"], ["Kshema", "well-being: good", "good"],
+  ["Pratyari", "opposition: obstacles", "bad"], ["Sadhaka", "achievement: good", "good"], ["Vadha", "harm: difficult", "bad"], ["Mitra", "friend: good", "good"], ["Parama Mitra", "best friend: very good", "good"]];
+function taraOf(lon) { const j = nakOf(natal.Moon.lon).i, t = nakOf(lon).i, n = ((t - j + 27) % 27) + 1, T = TARA[(n - 1) % 9]; return {n, name: T[0], meaning: T[1], cls: T[2]}; }
+
+const KARAKA = {Sun: "self, father and authority", Moon: "mind, mother and feelings", Mars: "energy, courage and property", Mercury: "thinking, speech and trade", Jupiter: "wisdom, children and fortune",
+  Venus: "love, partner and comforts", Saturn: "work, duty and endurance", Rahu: "ambition and cravings", Ketu: "detachment and the past", Asc: "body and self"};
+// the Moon counts as a benefic while it is bright (more than 72° from the Sun), as a malefic when dark
+const MALEFIC = b => ["Sun", "Mars", "Saturn", "Rahu", "Ketu"].includes(b) || (b === "Moon" && (e => e < 72 || e > 288)(norm360(bodies.Moon.lon - bodies.Sun.lon)));
+function lagnaShort(b, h) {
+  if (MALEFIC(b)) return [3, 6, 10, 11].includes(h) ? "effort in this area pays off" : [8, 12].includes(h) ? "it is a heavy spot, so go slowly" : "it can bring friction or delay here";
+  return [1, 4, 5, 7, 9, 10].includes(h) ? "it is a blessing for this area" : [6, 8, 12].includes(h) ? "its kindness is muted here" : "it brings ease and gains here";
+}
+function lagnaTone(b, h) {
+  if (MALEFIC(b)) {
+    if ([3, 6, 10, 11].includes(h)) return "Hard planets grow stronger in this house (an upachaya, a house of growth), so effort here pays off.";
+    if ([8, 12].includes(h)) return "This is a heavy spot for a hard planet, so go slowly and look after health and money.";
+    return "It can press on these matters and bring friction or delay. Patience works better than force.";
+  }
+  if ([1, 4, 5, 7, 9, 10].includes(h)) return "A gentle planet in a strong house is a blessing for these matters.";
+  if ([6, 8, 12].includes(h)) return "Its kindness is muted here. It works best for healing, study and inner work.";
+  return "It is helpful here and brings ease and gains to these matters.";
+}
+const COMBUST = {Moon: 12, Mars: 17, Mercury: 14, Jupiter: 11, Venus: 10, Saturn: 15};
+function combustOf(b) { if (!(b in COMBUST)) return false; const o = COMBUST[b] - (bodies[b].retro && (b === "Mercury" || b === "Venus") ? 2 : 0); return sepLon(bodies[b].lon, bodies.Sun.lon) < o; }
+function warOf(b) { const W = ["Mars", "Mercury", "Jupiter", "Venus", "Saturn"]; if (!W.includes(b)) return null; return W.find(x => x !== b && sepLon(bodies[x].lon, bodies[b].lon) < 1) || null; }
+
+// two planets travelling in the same sign
+const COMBO = {
+  "Sun+Moon": "New Moon energy: a fresh start for this house, though energy runs low.", "Sun+Mars": "High drive and ambition, with a quick temper.",
+  "Sun+Mercury": "Budha-Aditya yoga: a sharp mind, good for study, writing and talks.", "Sun+Jupiter": "Confidence and blessings from mentors and elders.",
+  "Sun+Venus": "Venus is outshone by the Sun: love and pleasure feel dimmer.", "Sun+Saturn": "Friction with authority or father, and low energy; slow and steady wins.",
+  "Sun+Rahu": "A Grahan (eclipse) pattern on the Sun: confidence and health feel clouded.", "Sun+Ketu": "A Grahan pattern on the Sun: you may feel unseen; good for inner work.",
+  "Moon+Mars": "Chandra-Mangala yoga: drive to earn, and emotional heat.", "Moon+Mercury": "A quick, chatty and restless mind.",
+  "Moon+Jupiter": "Gaja Kesari yoga: wisdom, support and a good name.", "Moon+Venus": "Comfort, affection and enjoyment.",
+  "Moon+Saturn": "Vish yoga: a heavy, low mood; rest and routine help.", "Moon+Rahu": "A Grahan pattern on the mind: anxiety and restlessness.", "Moon+Ketu": "A Grahan pattern on the mind: detachment and confusion.",
+  "Mars+Mercury": "A sharp tongue and fast decisions; good for debate, risky for relationships.", "Mars+Jupiter": "Guru-Mangala yoga: purposeful action, courage guided by wisdom.",
+  "Mars+Venus": "Passion and attraction, with impulsive spending.", "Mars+Saturn": "Pressure and frustration, and a higher risk of accidents; put it into hard work.",
+  "Mars+Rahu": "Angaraka yoga: anger, impulsiveness and risk; stay careful.", "Mars+Ketu": "Sudden, sharp energy: good for technical work, but watch for injuries.",
+  "Mercury+Jupiter": "Good learning, wise counsel and sound plans.", "Mercury+Venus": "Charm, arts and diplomacy; good for trade.",
+  "Mercury+Saturn": "Careful, serious thinking; slower paperwork.", "Mercury+Rahu": "Clever but scattered or misleading talk; double-check details.", "Mercury+Ketu": "Intuition over logic; easy to lose track of details.",
+  "Jupiter+Venus": "Two benefics together: comfort, learning and grace; avoid excess.", "Jupiter+Saturn": "Structured growth and big long-term shifts.",
+  "Jupiter+Rahu": "Guru-Chandala yoga: judgment can be clouded; check advice and beliefs.", "Jupiter+Ketu": "Spiritual insight and detachment from worldly goals.",
+  "Venus+Saturn": "Steady, committed love, with delayed pleasures.", "Venus+Rahu": "Intense desires and unusual attractions.", "Venus+Ketu": "Detachment in love; spiritual art.",
+  "Saturn+Rahu": "Shrapit yoga: a heavy, karmic feel and delays; steady duty helps.", "Saturn+Ketu": "Endings, detachment and spiritual discipline.", "Rahu+Ketu": ""};
+const comboKey = (a, b) => [a, b].sort((x, y) => PLANETS.indexOf(x) - PLANETS.indexOf(y)).join("+");
+const ASPECT_TONE = {Sun: "spotlight and heat", Moon: "care and attention", Mars: "push and conflict", Mercury: "ideas and talks", Jupiter: "protection and growth", Venus: "ease and charm", Saturn: "pressure and delays"};
+function aspectFrom(b, fromSign, toSign) { if (b === "Rahu" || b === "Ketu" || fromSign === toSign) return 0; const n = ((toSign - fromSign + 12) % 12) + 1; return n === 7 || (b === "Mars" && (n === 4 || n === 8)) || (b === "Jupiter" && (n === 5 || n === 9)) || (b === "Saturn" && (n === 3 || n === 10)) ? n : 0; }
+
+// Vimshottari dasha
+const DASHA_SEQ = ["Ketu", "Venus", "Sun", "Moon", "Mars", "Rahu", "Jupiter", "Saturn", "Mercury"], DASHA_YRS = {Ketu: 7, Venus: 20, Sun: 6, Moon: 10, Mars: 7, Rahu: 18, Jupiter: 16, Saturn: 19, Mercury: 17};
+function dashaAt(tp) {
+  if (tp < natal.birth) return null;
+  const Y = 365.25 * DAY, ml = norm360(natal.Moon.lon), k = Math.floor(ml / NAKW), f = (ml - k * NAKW) / NAKW;
+  let i = k % 9, start = natal.birth - f * DASHA_YRS[DASHA_SEQ[i]] * Y;
+  for (let guard = 0; guard < 40; guard++) {
+    const L = DASHA_SEQ[i], len = DASHA_YRS[L] * Y;
+    if (tp < start + len) { let a = start, j = i; for (let q = 0; q < 9; q++) { const A = DASHA_SEQ[j], al = len * DASHA_YRS[A] / 120; if (tp < a + al) return {md: L, mdEnd: start + len, ad: A, adEnd: a + al}; a += al; j = (j + 1) % 9; } }
+    start += len; i = (i + 1) % 9;
+  }
+  return null;
+}
+// the next planets to arrive in a sign (skipped while time races, to keep things smooth)
+const arrCache = {key: "", list: []};
+function nextArrivals(s, tp) {
+  const key = s + ":" + Math.floor(tp / (2 * DAY)) + ":" + person.id; if (arrCache.key === key) return arrCache.list;
+  const out = [];
+  for (const [b, step, span] of [["Sun", 1, 40], ["Mercury", 1, 60], ["Venus", 1, 70], ["Mars", 2, 140], ["Jupiter", 7, 420], ["Saturn", 14, 1000], ["Rahu", 14, 600]]) {
+    if (signOf(bodies[b].lon) === s) continue;
+    for (let d = step; d <= span; d += step) { const t = tp + d * DAY; if (signOf(sidPos(b, new Date(t)).lon) === s) { out.push({b, t}); break; } }
+  }
+  out.sort((a, b) => a.t - b.t); arrCache.key = key; arrCache.list = out.slice(0, 3); return out.slice(0, 3);
+}
+const degMin = x => `${Math.floor(x)}°${String(Math.round((x % 1) * 60)).padStart(2, "0")}′`;
+const fmtDay = t => fmtT(t, {day: "numeric", month: "short", year: "numeric"});
+const STAY = {Saturn: "about two and a half years", Jupiter: "about a year", Rahu: "about eighteen months", Ketu: "about eighteen months", Mars: "about six weeks", Sun: "about a month", Venus: "about a month", Mercury: "two to eight weeks", Moon: "about two and a half days"};
+const listNames = a => a.length < 2 ? a.join("") : a.slice(0, -1).join(", ") + " and " + a[a.length - 1];
+const cap = t => t.charAt(0).toUpperCase() + t.slice(1);
+
+// one planet passing through the house: strength, star, meaning for you, classical result, links to the birth chart and dasha
+function planetReading(b, s, h, da) {
+  const o = bodies[b], nk = nakOf(o.lon), nx = NAKX[nk.i], tr = taraOf(o.lon), vd = vedhaOf(b), dg = dignityOf(b, o.lon), short = HOUSES[h - 1][1].split(", ").slice(0, 3).join(", ");
+  let score = vd.good ? 1 : -1;
+  const helps = [], presses = [], strength = [cap(dg.label)];
+  if (vd.good && vd.blocked.length) score = 0; if (!vd.good && vd.eased && vd.eased.length) score = -0.25;
+  score += dg.score;
+  if (o.retro) strength.push("retrograde, so its themes come back for review");
+  if (combustOf(b)) { strength.push("combust (too close to the Sun), which weakens it"); score -= 0.5; presses.push(`${b} combust`); }
+  const war = warOf(b); if (war) strength.push(`in a close "planetary war" with ${war}, which can make both act unevenly`);
+  let bav = null;
+  if (SEVEN.includes(b)) {
+    bav = ashtakavarga().bav[b][s];
+    const bt = bav >= 5 ? "strong support" : bav === 4 ? "average support" : "weak support";
+    strength.push(`${bav} of 8 bindus in its Ashtakavarga here (${bt})`);
+    if (bav >= 5) { score += 1; helps.push(`${b}'s strong Ashtakavarga (${bav}/8)`); } else if (bav <= 2) { score -= 1; presses.push(`${b}'s weak Ashtakavarga (${bav}/8)`); } else if (bav === 3) score -= 0.5;
+    const kk = kakshyaOf(b, o.lon);
+    strength.push(`in the ${kk.lord} kakshya (${degMin(kk.from)}–${degMin(kk.to)} of the sign), where ${kk.lord} ${kk.gave ? "gave a bindu, so this stretch is supportive" : "gave no bindu, so this stretch is harder"}`);
+  }
+  if (dg.score >= 1) helps.push(`${b} ${dg.label.split(" (")[0]}`); else if (dg.score <= -1) presses.push(`${b} ${dg.label.split(" (")[0]}`);
+  // star
+  let star = `${nk.name} pada ${nk.pada}: ruled by ${nx[0]}, deity ${nx[1]}, a ${NAKTYPE[nx[2]]} star.`;
+  if (nx[0] === b) star += ` ${b} is in its own star, so it acts strongly.`;
+  star += ` It is the ${ord(tr.n)} star from your birth star: <span class="${tr.cls}">${tr.name}, ${tr.meaning}</span>.`;
+  // classical result from the Moon
+  let fm = `<span class="${vd.good ? "good" : "bad"}">${cap(GOCHARA[b][vd.n - 1])}</span>.`;
+  if (vd.good && vd.blocked.length) fm += ` But ${listNames(vd.blocked)}, now in your ${ord(vd.vh)} from your birth Moon, ${vd.blocked.length > 1 ? "block" : "blocks"} this (vedha), so the good is held back for now.`;
+  if (!vd.good && vd.eased && vd.eased.length) fm += ` But ${listNames(vd.eased)}, now in your ${ord(vd.vh)} from your birth Moon, ${vd.eased.length > 1 ? "ease" : "eases"} this (vipareeta vedha).`;
+  if (vd.good && !vd.blocked.length) helps.push(`${b} well placed from your Moon`); else if (!vd.good && !(vd.eased && vd.eased.length)) presses.push(`${b} in your ${ord(vd.n)} from the Moon`);
+  // links to the birth chart
+  const links = [];
+  for (const nb of ["Asc", ...PLANETS]) {
+    if (nb === b && b !== "Saturn" && b !== "Jupiter") continue;
+    if (signOf(natal[nb].lon) !== s || b === "Moon") continue;
+    const d = sepLon(o.lon, natal[nb].lon), nm = nb === "Asc" ? "Lagna" : nb;
+    if (nb === b) links.push(`<span class="${b === "Jupiter" ? "good" : "hit"}">${b} return</span>: ${b} is back where it was at your birth (${d.toFixed(1)}° away), a milestone for ${KARAKA[b]}.`);
+    else links.push(`<span class="hit">Over your birth ${nm}</span> (${d.toFixed(1)}° away): your ${KARAKA[nb]} feel ${b}'s ${NATURE[b].split(" for ")[0]}.`);
+  }
+  // dasha
+  const dl = [];
+  if (da && b === da.md) { dl.push(`${b} is your Mahadasha (main period) lord, so this transit is felt strongly.`); score += score >= 0 ? 0.5 : -0.5; }
+  if (da && b === da.ad) dl.push(`${b} is your current Antardasha (sub-period) lord, so its effects are switched on now.`);
+  if (LORD[s] === b) dl.push(`${b} rules this house, and a lord in its own house protects it.`);
+  const rows = [["Strength", strength.join("; ") + "."], ["Star", star], ["For you", `It brings ${NATURE[b]} into your ${ord(h)} house (${short}). ${lagnaTone(b, h)}`],
+    [`From your Moon (${ord(vd.n)})`, fm]];
+  if (links.length) rows.push(["Your chart", links.join(" ")]);
+  if (dl.length) rows.push(["Dasha", dl.join(" ")]);
+  const tag = `${vd.good ? (vd.blocked.length ? "good, but blocked" : "supportive") : (vd.eased && vd.eased.length ? "testing, eased" : "testing")}${bav !== null ? ` · ${bav}/8` : ""}`;
+  return {b, score, helps, presses, n: vd.n, good: vd.good && !vd.blocked.length, tag, rows};
+}
+
+const insOpen = new Set(); let insBig = false;   // insBig: the reader has expanded the card to read it in full   // which sections the reader has opened, kept across refreshes
+function section(key, title, body, open) {
+  return `<details data-k="${key}"${insOpen.has(key) || (open && !insOpen.has("!" + key)) ? " open" : ""}><summary>${title}</summary>${body}</details>`;
+}
+const rowsHTML = rows => `<dl class="rows">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl>`;
+
+function insightsHTML(s, tp) {
+  const h = houseNo(s), [bhava, sig] = HOUSES[h - 1], lagnaSign = signOf(natal.Asc.lon), ms = signOf(natal.Moon.lon), av = ashtakavarga();
+  const short = sig.split(", ").slice(0, 3).join(", ");
+  const now = PLANETS.filter(b => signOf(bodies[b].lon) === s), da = dashaAt(tp);
+  const reads = now.map(b => planetReading(b, s, h, da));
+  let score = reads.reduce((a, r) => a + r.score, 0);
+  const helps = reads.flatMap(r => r.helps), presses = reads.flatMap(r => r.presses);
+  // planets looking at this house
+  const aspRows = [];
+  for (const b of PLANETS) {
+    const n = aspectFrom(b, signOf(bodies[b].lon), s); if (!n) continue;
+    const good = !MALEFIC(b); score += good ? 0.75 : -0.75; (good ? helps : presses).push(`${b}'s aspect`);
+    aspRows.push(`${dot(b)}<b>${b}</b> looks here from ${signName(signOf(bodies[b].lon))} (${ord(n)} aspect): <span class="${good ? "good" : "bad"}">${ASPECT_TONE[b]}</span>.`);
+  }
+  // the lord of the house
+  const L = LORD[s], lo = bodies[L], lh = ((signOf(lo.lon) - lagnaSign + 12) % 12) + 1, ldg = dignityOf(L, lo.lon), back = aspectFrom(L, signOf(lo.lon), s) || signOf(lo.lon) === s;
+  let lordJ;
+  if ([1, 4, 5, 7, 9, 10].includes(lh)) { lordJ = "well placed to support this house"; score += 0.5; helps.push(`its lord ${L} well placed`); }
+  else if ([6, 8, 12].includes(lh)) { lordJ = "in a hidden house, so this house's matters need more effort"; score -= 0.5; presses.push(`its lord ${L} in your ${ord(lh)}`); }
+  else lordJ = "moderately placed";
+  score += ldg.score * 0.5;
+  const lordTxt = `${dot(L)}<b>${L}</b>, the lord, is now in your ${ord(lh)} house (${signName(signOf(lo.lon))}), ${ldg.label}${lo.retro ? ", retrograde" : ""}${combustOf(L) ? ", combust" : ""}: ${lordJ}.${back && signOf(lo.lon) !== s ? " It also looks back at this house, which protects it." : ""}`;
+  // Sarvashtakavarga of the sign
+  const sav = av.sav[s];
+  if (sav >= 30) { score += 1; helps.push(`strong Ashtakavarga for the sign (${sav})`); } else if (sav >= 28) score += 0.5; else if (sav < 25) { score -= 1; presses.push(`low Ashtakavarga for the sign (${sav})`); } else score -= 0.5;
+  const savTxt = `This sign holds <b>${sav}</b> of the 337 Ashtakavarga points (the average is 28). ${sav >= 28 ? "Transits here tend to work out well." : "Transits here tend to feel heavier."}`;
+  // combinations
+  const combos = [];
+  for (let i = 0; i < now.length; i++) for (let j = i + 1; j < now.length; j++) { const t = COMBO[comboKey(now[i], now[j])]; if (t) combos.push(`${dot(now[i])}${dot(now[j])}<b>${now[i]} + ${now[j]}</b>: ${t}`); }
+  if ((now.includes("Moon") || now.includes("Jupiter")) && !(now.includes("Moon") && now.includes("Jupiter"))) {
+    const k = ((signOf(bodies.Moon.lon) - signOf(bodies.Jupiter.lon) + 12) % 12) + 1;
+    if ([4, 7, 10].includes(k)) combos.push(`${dot("Moon")}${dot("Jupiter")}<b>Gaja Kesari</b>: the Moon and Jupiter are in angles to each other today, which brings support and a good name.`);
+  }
+  // verdict
+  const V = score >= 1.5 ? ["Well supported", "good"] : score >= 0.5 ? ["Leaning good", "good"] : score > -0.5 ? ["Mixed", "mixed"] : score > -1.5 ? ["Some pressure", "bad"] : ["Under pressure", "bad"];
+  const advice = {"Well supported": `A good time to move forward on ${short}.`, "Leaning good": `Things here lean your way, and steady action helps.`, "Mixed": `The signals are mixed, so take ${short} step by step.`,
+    "Some pressure": `Go gently with ${short}; patience and routine work best.`, "Under pressure": `A testing phase for ${short}: slow down, plan carefully and avoid big risks here.`}[V[0]];
+  // the picture now
+  const pic = [];
+  if (now.length) pic.push(`${listNames(now.map(b => `<b>${b}</b>`))} ${now.length > 1 ? "are" : "is"} moving through your ${ord(h)} house, the house of ${short}.`);
+  else pic.push(`No planet is moving through your ${ord(h)} house (${short}) right now, so it runs on its lord and the planets looking at it.`);
+  const lead = reads.find(r => ["Saturn", "Jupiter", "Rahu", "Ketu"].includes(r.b)) || reads.find(r => r.b !== "Moon") || reads[0];
+  if (lead) pic.push(`${lead.b} stays in a sign for ${STAY[lead.b]} and sets the tone. Counted from your Moon (the classical way), it brings ${GOCHARA[lead.b][lead.n - 1]}; counted from your Lagna, ${lagnaShort(lead.b, h)}.`);
+  if (da && (now.includes(da.md) || now.includes(da.ad) || L === da.md || L === da.ad)) {
+    const who = [da.md, da.ad].filter((x, i, a) => a.indexOf(x) === i && (now.includes(x) || L === x));
+    pic.push(`Your running ${da.md}–${da.ad} dasha is tied to this house through ${listNames(who)}, so what happens here matters more right now.`);
+  }
+  if (helps.length) pic.push(`<span class="good">Helping:</span> ${listNames([...new Set(helps)].slice(0, 3))}.`);
+  if (presses.length) pic.push(`<span class="bad">Pressing:</span> ${listNames([...new Set(presses)].slice(0, 3))}.`);
+  pic.push(advice);
+  // sections
+  const planetSecs = reads.map((r, i) => section("p:" + r.b, `${dot(r.b)}<b>${r.b}</b>${bodies[r.b].retro ? " ℞" : ""} <span class="m">${dms(bodies[r.b].lon)} · ${nakOf(bodies[r.b].lon).name} ${nakOf(bodies[r.b].lon).pada} · <span class="${r.good ? "good" : "bad"}">${r.tag}</span></span>`, rowsHTML(r.rows), i === 0)).join("");
+  const infl = [...combos.map(c => `<li>${c}</li>`), ...aspRows.map(a => `<li>${a}</li>`), `<li>${lordTxt}</li>`, `<li>${savTxt}</li>`];
+  if (!now.length && Math.abs(rate) <= 3600 && !jump) { const nx = nextArrivals(s, tp); if (nx.length) infl.push(`<li class="m">Next to arrive: ${nx.map(x => `${dot(x.b)}${x.b} around ${fmtDay(x.t)}`).join(", ")}.</li>`); }
+  infl.push(`<li class="m">${moonVisit(s, tp)}</li>`);
+  const birth = PLANETS.filter(b => signOf(natal[b].lon) === s).map(b => `${dot(b)}${b} <span class="m">${dms(natal[b].lon)}, ${dignityOf(b, natal[b].lon).label}</span>`);
+  const nl = natal[L], nlh = ((signOf(nl.lon) - lagnaSign + 12) % 12) + 1;
+  const bl = [birth.length ? `Born with ${birth.join(", ")} here.` : `<span class="m">No birth planets here.</span>`,
+    lagnaSign === s ? "This is your Lagna (rising sign), so it colours your whole chart." : "",
+    `At birth, the lord ${dot(L)}${L} sat in your ${ord(nlh)} house (${signName(signOf(nl.lon))}), ${dignityOf(L, nl.lon).label}.`,
+    `This sign is ${ord(((s - ms + 12) % 12) + 1)} from your birth Moon.`];
+  if (da) {
+    bl.push(`Running <b>${da.md}</b> Mahadasha (until ${fmtDay(da.mdEnd)}), <b>${da.ad}</b> Antardasha (until ${fmtDay(da.adEnd)}).`);
+    for (const x of [da.md, da.ad].filter((v, i, a) => a.indexOf(v) === i)) {
+      if (LORD[s] === x) bl.push(`${x} rules this house, so this period brings its matters forward.`);
+      else if (signOf(natal[x].lon) === s) bl.push(`${x} sat in this house at your birth, so this period brings its matters forward.`);
+    }
+  }
+  const nowSecs = planetSecs || `<p class="m" style="margin:4px 0">No planet is passing through this house right now.</p>`;
+  const xIcon = insBig ? '<path d="M9 4v5H4"/><path d="M15 20v-5h5"/><path d="M4 4l5 5"/><path d="M20 20l-5-5"/>' : '<path d="M4 9V4h5"/><path d="M20 15v5h-5"/><path d="M4 4l6 6"/><path d="M20 20l-6-6"/>';
+  return `<div class="hvi-head"><b>House ${h}</b><span>${signFull(s)}</span><span class="tag">${bhava}</span><span class="verdict ${V[1]}">${V[0]}</span><button class="hvi-x" type="button" data-act="expand" aria-label="${insBig ? "Make the reading smaller" : "Expand the reading"}" title="${insBig ? "Smaller" : "Expand"}"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${xIcon}</svg></button></div>
+  <p class="hvi-sig">Signifies ${sig}.</p>
+  <p class="hvi-now">${pic.join(" ")}</p>
+  <div class="hvi-cols"><div><h3>Planets here now</h3>${nowSecs}</div>
+  <div><h3>What shapes this house</h3>${section("infl", "Combinations, aspects and support", `<ul>${infl.join("")}</ul>`, !now.length)}${section("birth", `Birth chart and dasha${da ? ` <span class="m">· ${da.md}–${da.ad}</span>` : ""}`, `<ul>${bl.filter(Boolean).map(x => `<li>${x}</li>`).join("")}</ul>`, false)}</div></div>
+  <div class="hvi-side">${sideLine((s + 1) % 12, "l")}${sideLine((s + 11) % 12, "r")}</div>
+  <p class="hvi-foot">Based on classical rules from Phaladeepika and Brihat Parashara Hora Shastra (transits from the Moon, vedha, Ashtakavarga, dignity, nakshatras, Vimshottari dasha). These are traditional readings, not certainties.</p>`;
+}
+
 let insKey = "", insT = 0, insState = "closed";
 function placeInsights(x0, x1, ctrlTop, cs) {
   const el = $("hv-info");
   if (!layers.insights && insState !== "closing") { el.hidden = true; insState = "closed"; return; }
-  const topLimit = $("topbar").getBoundingClientRect().bottom - $("app").getBoundingClientRect().top + 8, bottom = ctrlTop - 8, maxH = bottom - topLimit;
+  const appTop = $("app").getBoundingClientRect().top, topLimit = $("topbar").getBoundingClientRect().bottom - appTop + 8;
+  const bottom = insBig ? document.querySelector(".timebar").getBoundingClientRect().top - appTop - 10 : ctrlTop - 8, maxH = bottom - topLimit;
+  el.classList.toggle("big", insBig);
   if (maxH < 70) { el.hidden = true; insState = "closed"; return; }
   const wasHidden = el.hidden; el.hidden = false;
   const aw = hvAreaW || W, narrow = aw < 760, left = narrow ? 10 : x0, width = narrow ? aw - 20 : x1 - x0;
   el.style.left = left + "px"; el.style.width = width + "px"; el.style.bottom = (H - bottom) + "px"; el.style.maxHeight = maxH + "px";
   const now = performance.now(), key = [cs, Math.floor(lastTp / 60000), person.id, lang, layers.now, layers.birth].join("|");
-  if (key !== insKey && (wasHidden || now - insT > 300 || Math.floor(+insKey.split("|")[0]) !== cs)) { insKey = key; insT = now; el.innerHTML = insightsHTML(cs, lastTp); }
+  if (key !== insKey && (wasHidden || now - insT > 300 || Math.floor(+insKey.split("|")[0]) !== cs)) { const sameHouse = Math.floor(+insKey.split("|")[0]) === cs, st = el.scrollTop; insKey = key; insT = now; el.innerHTML = insightsHTML(cs, lastTp); if (sameHouse) el.scrollTop = st; }
   if (wasHidden && layers.insights) openIns();
 }
 /* iOS-style open/close: the card grows out of the Insights button and shrinks back into it */
@@ -1440,6 +1721,8 @@ function closeIns() {
 function markIns() { $("hv-ins").setAttribute("aria-pressed", String(!!layers.insights)); const cb = $("ly-insights"); if (cb) cb.checked = !!layers.insights; }
 function setInsights(on) { layers.insights = on; saveLayers(); markIns(); insKey = ""; if (!on) closeIns(); }
 $("hv-ins").addEventListener("click", () => setInsights(!layers.insights));
+$("hv-info").addEventListener("click", e => { if (e.target.closest("[data-act=expand]")) { insBig = !insBig; insKey = ""; } });
+$("hv-info").addEventListener("toggle", e => { const d = e.target, k = d.dataset && d.dataset.k; if (!k) return; if (d.open) { insOpen.add(k); insOpen.delete("!" + k); } else { insOpen.delete(k); insOpen.add("!" + k); } }, true);
 
 let lastView = "";
 /* ---------------- keyboard: game-style looking around ----------------
