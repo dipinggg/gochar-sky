@@ -65,3 +65,11 @@ SOFTWARE.
 ## Open-Meteo geocoding
 
 Place search uses the Open-Meteo geocoding API (https://open-meteo.com/). Location data © GeoNames, licensed under CC BY 4.0.
+
+## Fonts
+
+The page embeds three fonts (as reduced WOFF2 files inside `index.html`):
+
+- **Archivo** (used for text). Copyright 2020 The Archivo Project Authors (https://github.com/Omnibus-Type/Archivo). Licensed under the SIL Open Font License, Version 1.1 (https://openfontlicense.org). This copy is a subset with the width axis fixed at 100.
+- **Advercase** (used for titles) by Indieground Design. Used under a licence held by the site owner; not covered by this repository's terms and not for reuse.
+- **OPTIOpus** (used for rashi names, house numbers and nakshatras), Castcraft Software Inc. Used under a licence held by the site owner; not covered by this repository's terms and not for reuse.
