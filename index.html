@@ -984,12 +984,7 @@ function drawHouseFrame(ctx) {
   if (!pl || !pr || !pt || !pb) return;
   const x0 = Math.min(pl[0], pr[0]), x1 = Math.max(pl[0], pr[0]), y0 = Math.min(pt[1], pb[1]), y1 = Math.max(pt[1], pb[1]), a = hvAmt;
   ctx.globalAlpha = a;
-  ctx.fillStyle = "rgba(4,5,26,.58)"; ctx.beginPath(); ctx.rect(0, 0, W, H); rrect(ctx, x0, y0, x1 - x0, y1 - y0, 12); ctx.fill("evenodd");
-  ctx.strokeStyle = "rgba(233,201,135,.55)"; ctx.lineWidth = 1.2; ctx.beginPath(); rrect(ctx, x0, y0, x1 - x0, y1 - y0, 12); ctx.stroke();
-  if (hv.mode === "on" && !hv.nav) {   // soft highlight on the centre house
-    const c0 = pECL(cs * 30 + 30, 0), c1 = pECL(cs * 30, 0);
-    if (c0 && c1) { ctx.fillStyle = "rgba(233,201,135,.06)"; ctx.fillRect(Math.min(c0[0], c1[0]), y0 + 1, Math.abs(c1[0] - c0[0]), y1 - y0 - 2); }
-  }
+  // no outline and no dimming outside: the frame area sits on the same sky as everything around it
   // degree scale along the bottom edge: a long tick at each sign boundary, 10° and 20° marked
   ctx.strokeStyle = "rgba(233,201,135,.6)";
   const base = Math.floor(lam / 30) * 30;
@@ -997,7 +992,7 @@ function drawHouseFrame(ctx) {
     if (Math.abs(L - lam) > HV_HALF + 0.01) continue;
     const p = pECL(L, -HV_LAT); if (!p) continue; const d = ((L % 30) + 30) % 30, edge = d === 0;
     ctx.lineWidth = edge ? 1.4 : 1; ctx.beginPath(); ctx.moveTo(p[0], y1); ctx.lineTo(p[0], y1 - (edge ? 14 : d % 10 === 0 ? 8 : 4)); ctx.stroke();
-    if (!edge && d % 10 === 0) text(ctx, d + "°", p[0], y1 - 18, "rgba(233,201,135,.7)", `10px ${FM}`);
+    if (!edge && d % 10 === 0 && y1 - y0 > 140) text(ctx, d + "°", p[0], y1 - 18, "rgba(233,201,135,.7)", `10px ${FM}`);   // too cramped on phones: ticks only
   }
   if (hv.mode === "on") {
     // captions under the three houses: house number, sign, then the planets in it now and at birth
