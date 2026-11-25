@@ -9,7 +9,7 @@ A live Vedic *gochar* (transit) sky that runs in your browser. It shows the real
 - **Real sky, live.** Over 5,000 stars, the Milky Way and the constellations, turning in real time over the place you choose.
 - **Vedic overlay.** Sidereal signs (Lahiri ayanamsa) as soft bands with whole-sign house numbers from your Lagna, plus optional nakshatras and their junction stars.
 - **Your chart.** Enter a name, birth date, birth time and birth place (any town worldwide). Your birth planets appear as faint discs fixed among the stars, and today's planets appear in full colour. A close contact (a planet within 3° of a birth planet) pulses.
-- **House view.** A fixed frame shows three houses at a time, level and upright, with arrows to move through all twelve. A card above it explains what each house signifies and what is happening in it now.
+- **House view.** A fixed frame shows three houses at a time, level and upright, with arrows to move through all twelve. A card above it explains what each house signifies and what is happening in it now. Pinch out (or double-tap, or press +) to zoom into the centre house, where every degree and the nakshatras inside it are marked; pinch in to go back to three houses.
 - **Time travel.** Jump to any date and time and watch the sky glide there, or play time forward and backward with star trails.
 
 ## Privacy
