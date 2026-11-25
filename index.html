@@ -61,6 +61,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 .hvarrow span{font-family:var(--f-display);font-size:2.1rem;line-height:.9}
 .hvarrow small{font-size:.66rem;color:var(--muted);line-height:1.25;text-align:center}
 .hvctrl{display:flex;gap:6px;z-index:3}
+.hvctrl .btn.icon{width:38px;height:38px;padding:0;display:grid;place-items:center;border-radius:11px}
 .modal{position:absolute;inset:0;z-index:8;display:grid;place-items:center;background:rgba(2,3,14,.6);padding:16px}
 .modal .card{width:min(460px,100%);max-height:100%;overflow:auto;border-radius:16px;padding:18px 18px 16px;display:grid;gap:10px}
 .modal h2{font-family:var(--f-display);font-weight:400;letter-spacing:.14em;margin:0;font-size:1.3rem;color:var(--gold)}
@@ -97,7 +98,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 .hvi-side b{color:var(--ink);font-weight:600}
 
 /* drawer */
-.panel{right:12px;top:66px;bottom:146px;width:300px;border-radius:14px;display:flex;flex-direction:column;overflow:hidden}
+.panel{right:12px;top:66px;bottom:146px;width:300px;border-radius:14px;display:flex;flex-direction:column;overflow:hidden;z-index:5}
 .panel[hidden]{display:none}
 .tabs{display:flex;gap:4px;padding:8px 8px 0}
 .tab{flex:1;padding:8px;border:0;border-radius:9px 9px 0 0;background:transparent;color:var(--muted);font-weight:600;font-size:.84rem;cursor:pointer;border-bottom:2px solid transparent}
@@ -290,8 +291,8 @@ form.add{display:grid;gap:8px;margin-top:8px}
   <button class="hud hvarrow glass" id="hv-left" type="button" hidden><span aria-hidden="true">‹</span><small id="hv-left-l"></small></button>
   <button class="hud hvarrow glass" id="hv-right" type="button" hidden><span aria-hidden="true">›</span><small id="hv-right-l"></small></button>
   <div class="hud hvctrl" id="hv-ctrl" hidden>
-    <button class="btn glass" id="hv-ins" type="button" aria-pressed="true">Insights</button>
-    <button class="btn glass" id="hv-exit" type="button">Back to sky</button>
+    <button class="btn glass icon" id="hv-ins" type="button" aria-pressed="true" aria-label="House insights" title="House insights"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5"/><path d="M12 7.6h.01" stroke-width="2.6"/></svg></button>
+    <button class="btn glass icon" id="hv-exit" type="button" aria-label="Back to sky" title="Back to sky"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.5 3.5a6.5 6.5 0 0 0 8 8 8.6 8.6 0 1 1-8-8Z"/><path d="M19 2.8v3.6"/><path d="M20.8 4.6h-3.6"/></svg></button>
   </div>
   <section class="hud hvinfo" id="hv-info" hidden aria-live="polite" aria-label="House insights"></section>
 
@@ -1067,7 +1068,18 @@ const HV_K = 2.25;
 let hvZ = 0;   // the zoom being drawn this frame
 const hvZl = () => clamp((hvZ - 0.35) / 0.55, 0, 1);   // how far the zoomed-in details have faded in
 const hvLatH = () => 2 * Math.atan(Math.tan(HV_LAT / 2 * DEG) / Math.pow(HV_K, hvZ)) / DEG;   // frame half-height in degrees
-function hvS() { return Math.max(60, W / 2 - (W < 600 ? 52 : 70)) / (2 * Math.tan(26 * DEG)); }
+/* While the Filters panel is open on a wide screen, House view shrinks into the space to its left
+   (frame, arrows and insights all move together); on phones the panel is a bottom sheet instead. */
+let hvAreaW = 0, hvAreaT = 0;
+function hvAreaTarget() { const pn = $("panel"); return pn.hidden || W < 760 ? W : Math.max(320, W - pn.offsetWidth - 28); }
+function hvArea(now) {
+  const tgt = hvAreaTarget(), dt = hvAreaT ? Math.min(100, now - hvAreaT) : 1e9; hvAreaT = now;
+  hvAreaW = !hvAreaW || REDUCED ? tgt : hvAreaW + (tgt - hvAreaW) * (1 - Math.exp(-dt / 110));
+  if (Math.abs(hvAreaW - tgt) < 0.5) hvAreaW = tgt;
+  return hvAreaW;
+}
+const hvPanelCovers = () => W < 760 && !$("panel").hidden;   // phone: the bottom sheet covers House view
+function hvS() { const w = hvAreaW || W; return Math.max(60, w / 2 - (w < 600 ? 52 : 70)) / (2 * Math.tan(26 * DEG)); }
 function hvBasis(lamSid) { return {f: mul(F.EQJ_HOR, eclToEQJ(F, lamSid, 0)), u: mul(F.EQJ_HOR, mul(F.ECT_EQJ, [0, 0, 1])), S: hvS() * Math.pow(HV_K, hvZ)}; }
 function hvLam(now) {
   if (!hv.nav) return hv.lam;
@@ -1076,15 +1088,16 @@ function hvLam(now) {
   return hv.nav.from + (hv.nav.to - hv.nav.from) * ease(k);
 }
 function houseCam(now) {
-  hvZ = hvZoomNow(now);
+  hvZ = hvZoomNow(now); const aw = hvArea(now);
   const tgt = hvBasis(hvLam(now));
-  if (hv.mode === "on") { hvAmt = 1; return cameraBasis(tgt.f, tgt.u, tgt.S, W, H); }
+  if (hv.mode === "on") { hvAmt = 1; return cameraBasis(tgt.f, tgt.u, tgt.S, aw, H); }
   const k = clamp((now - hv.t0) / hv.dur, 0, 1), e = ease(k);
   let a, b;
   if (hv.mode === "enter") { a = hv.from; b = tgt; hvAmt = e; } else { a = tgt; b = hv.to; hvAmt = 1 - e; }
   const f = slerp(a.f, b.f, e, a.u), u = slerp(a.u, b.u, e, a.f), S = a.S + (b.S - a.S) * e;
+  const cw = hv.mode === "enter" ? W + (aw - W) * e : aw + (W - aw) * e;   // the centre slides between the full screen and the House view area
   if (k >= 1) { if (hv.mode === "enter") hv.mode = "on"; else { hv = null; hvAmt = 0; zoomTarget = view.fov; markHV(); } }
-  return cameraBasis(f, u, S, W, H);
+  return cameraBasis(f, u, S, cw, H);
 }
 function bandCentreSign() {
   let best = null;
@@ -1142,9 +1155,9 @@ function markHV() {
 const houseNo = s => ((s - signOf(natal.Asc.lon) + 12) % 12) + 1;
 function rrect(ctx, x, y, w, h, r) { if (ctx.roundRect) ctx.roundRect(x, y, w, h, r); else ctx.rect(x, y, w, h); }
 function drawHouseFrame(ctx) {
-  const onMode = !!hv && hv.mode === "on";
-  for (const id of ["hv-left", "hv-right", "hv-ctrl"]) $(id).hidden = !onMode;
-  if (!onMode) { $("hv-info").hidden = true; insState = "closed"; }
+  const onMode = !!hv && hv.mode === "on", covered = hvPanelCovers();
+  for (const id of ["hv-left", "hv-right", "hv-ctrl"]) $(id).hidden = !onMode || covered;
+  if (!onMode || covered) { $("hv-info").hidden = true; insState = "closed"; }
   if (!hv || hvAmt <= 0.02) return;
   const now = performance.now(), lam = hvLam(now), cs = Math.floor(norm360(hv.nav ? hv.nav.to : hv.lam) / 30);
   // the camera is always centred on the frame, so the frame never moves on screen
@@ -1214,10 +1227,10 @@ function drawHouseFrame(ctx) {
     // arrows sit just outside the frame and name the house they bring in
     const cy = (y0 + y1) / 2, Lb = $("hv-left"), Rb = $("hv-right"), Xc = $("hv-ctrl");
     Lb.style.left = Math.max(6, x0 - Lb.offsetWidth - 10) + "px"; Lb.style.top = (cy - Lb.offsetHeight / 2) + "px";
-    Rb.style.left = Math.min(W - Rb.offsetWidth - 6, x1 + 10) + "px"; Rb.style.top = (cy - Rb.offsetHeight / 2) + "px";
+    Rb.style.left = Math.min((hvAreaW || W) - Rb.offsetWidth - 6, x1 + 10) + "px"; Rb.style.top = (cy - Rb.offsetHeight / 2) + "px";
     const ctrlTop = Math.max(6, y0 - Xc.offsetHeight - 10);
     Xc.style.left = Math.max(6, x1 - Xc.offsetWidth) + "px"; Xc.style.top = ctrlTop + "px";
-    placeInsights(x0, x1, ctrlTop, cs);
+    if (!covered) placeInsights(x0, x1, ctrlTop, cs);
     const ls = ((cs + 1) % 12 + 12) % 12, rs = ((cs + 11) % 12);
     $("hv-left-l").textContent = `${houseNo(ls)} · ${signName(ls)}`; $("hv-right-l").textContent = `${houseNo(rs)} · ${signName(rs)}`;
     Lb.setAttribute("aria-label", `Show house ${houseNo(ls)}, ${signFull(ls)}`); Rb.setAttribute("aria-label", `Show house ${houseNo(rs)}, ${signFull(rs)}`);
@@ -1315,7 +1328,7 @@ function placeInsights(x0, x1, ctrlTop, cs) {
   const topLimit = $("topbar").getBoundingClientRect().bottom - $("app").getBoundingClientRect().top + 8, bottom = ctrlTop - 8, maxH = bottom - topLimit;
   if (maxH < 70) { el.hidden = true; insState = "closed"; return; }
   const wasHidden = el.hidden; el.hidden = false;
-  const narrow = W < 760, left = narrow ? 10 : x0, width = narrow ? W - 20 : x1 - x0;
+  const aw = hvAreaW || W, narrow = aw < 760, left = narrow ? 10 : x0, width = narrow ? aw - 20 : x1 - x0;
   el.style.left = left + "px"; el.style.width = width + "px"; el.style.bottom = (H - bottom) + "px"; el.style.maxHeight = maxH + "px";
   const now = performance.now(), key = [cs, Math.floor(lastTp / 60000), person.id, lang, layers.now, layers.birth].join("|");
   if (key !== insKey && (wasHidden || now - insT > 300 || Math.floor(+insKey.split("|")[0]) !== cs)) { insKey = key; insT = now; el.innerHTML = insightsHTML(cs, lastTp); }
