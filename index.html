@@ -606,6 +606,17 @@ const prevX = new Float32Array(NS).fill(NaN), prevY = new Float32Array(NS).fill(
 function radial(rgb, size, mid = .35) { const c = document.createElement("canvas"); c.width = c.height = size; const g = c.getContext("2d"); const gr = g.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2); gr.addColorStop(0, `rgba(${rgb},1)`); gr.addColorStop(mid, `rgba(${rgb},.32)`); gr.addColorStop(1, `rgba(${rgb},0)`); g.fillStyle = gr; g.fillRect(0, 0, size, size); return c; }
 const MW_SPRITE = radial("176,160,255", 64), STAR_GLOW = radial("235,238,255", 64);
 const GLOW = {}; for (const b of PLANETS) GLOW[b] = radial(P[b].glow, 128, .22);
+/* Mars, Jupiter and Saturn keep their simple shapes but get a smooth, vivid gradient (light on the sunward side,
+   deep on the far side) and a two-tone glow, in the style of flat space posters. */
+const VIVID = {Mars: ["#FFA36C", "#FF5A2E", "#C4261A"], Jupiter: ["#FFE494", "#F6B23F", "#D6731A"], Saturn: ["#B9C7FF", "#6F87FF", "#4144D0"]};
+function radial3(light, base, deep, size) {
+  const c = document.createElement("canvas"); c.width = c.height = size; const g = c.getContext("2d"), h = size / 2, gr = g.createRadialGradient(h, h, 0, h, h, h);
+  gr.addColorStop(0, `rgba(${light},1)`); gr.addColorStop(0.2, `rgba(${base},.55)`); gr.addColorStop(0.55, `rgba(${deep},.18)`); gr.addColorStop(1, `rgba(${deep},0)`);
+  g.fillStyle = gr; g.fillRect(0, 0, size, size); return c;
+}
+GLOW.Mars = radial3("255,150,90", "255,92,44", "214,44,30", 128);
+GLOW.Jupiter = radial3("255,224,130", "255,176,56", "226,116,24", 128);
+GLOW.Saturn = radial3("176,190,255", "112,128,255", "84,66,226", 128);
 /* ---------------- planet looks ----------------
    Soft painted versions of the real bodies, modelled on familiar solar-system renders but kept smooth:
    gradients and soft blobs only, no photo grain. Each look is painted once into a sprite and scaled.
@@ -918,12 +929,22 @@ function drawBody(ctx, b, x, y, r, o) {
     ctx.drawImage(GLOW[b], x - c, y - c, c * 2, c * 2);
     ctx.globalCompositeOperation = "source-over";
   }
-  if (flat) {   // Mars, Jupiter and Saturn: the original flat discs
-    const col = P[b].col;
-    if (b === "Saturn") { ctx.globalAlpha = a * 0.9; ctx.strokeStyle = "#CBD7FF"; ctx.lineWidth = Math.max(1.2, r * 0.22); ctx.beginPath(); ctx.ellipse(x, y, r * 1.95, r * 0.62, -0.38, Math.PI, 2 * Math.PI); ctx.stroke(); }
-    ctx.globalAlpha = a; ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, r, 0, 6.2832); ctx.fill();
-    if (b === "Jupiter" && r > 7) { ctx.save(); ctx.beginPath(); ctx.arc(x, y, r, 0, 6.2832); ctx.clip(); ctx.fillStyle = "rgba(160,96,30,.35)"; ctx.fillRect(x - r, y - r * 0.35, r * 2, r * 0.22); ctx.fillRect(x - r, y + r * 0.18, r * 2, r * 0.18); ctx.restore(); }
-    if (b === "Saturn") { ctx.globalAlpha = a * 0.95; ctx.beginPath(); ctx.ellipse(x, y, r * 1.95, r * 0.62, -0.38, 0, Math.PI); ctx.stroke(); }
+  if (flat) {   // Mars, Jupiter and Saturn: their original shapes, filled with a vivid gradient
+    const [lt, mid, dk] = VIVID[b], lx = Math.cos(o.limb || -2.4), ly = Math.sin(o.limb || -2.4);   // light comes from the Sun's side
+    let ring = null;
+    if (b === "Saturn") {
+      ring = ctx.createLinearGradient(x - r * 1.95, y, x + r * 1.95, y); ring.addColorStop(0, "#9DB0FF"); ring.addColorStop(0.5, "#DCE3FF"); ring.addColorStop(1, "#8C8CFF");
+      ctx.globalAlpha = a * 0.9; ctx.strokeStyle = ring; ctx.lineWidth = Math.max(1.2, r * 0.22); ctx.beginPath(); ctx.ellipse(x, y, r * 1.95, r * 0.62, -0.38, Math.PI, 2 * Math.PI); ctx.stroke();
+    }
+    const gr = ctx.createLinearGradient(x + lx * r * 0.85, y + ly * r * 0.85, x - lx * r, y - ly * r);
+    gr.addColorStop(0, lt); gr.addColorStop(0.5, mid); gr.addColorStop(1, dk);
+    ctx.globalAlpha = a; ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(x, y, r, 0, 6.2832); ctx.fill();
+    ctx.save(); ctx.beginPath(); ctx.arc(x, y, r, 0, 6.2832); ctx.clip();
+    if (b === "Jupiter" && r > 7) { ctx.fillStyle = "rgba(176,92,24,.3)"; ctx.fillRect(x - r, y - r * 0.35, r * 2, r * 0.22); ctx.fillRect(x - r, y + r * 0.18, r * 2, r * 0.18); }
+    const hx = x + lx * r * 0.45, hy = y + ly * r * 0.45, hl = ctx.createRadialGradient(hx, hy, 0, hx, hy, r * 1.05);   // soft light on the near side
+    hl.addColorStop(0, "rgba(255,255,255,.3)"); hl.addColorStop(1, "rgba(255,255,255,0)"); ctx.fillStyle = hl; ctx.fillRect(x - r, y - r, 2 * r, 2 * r);
+    ctx.restore();
+    if (ring) { ctx.globalAlpha = a * 0.95; ctx.strokeStyle = ring; ctx.beginPath(); ctx.ellipse(x, y, r * 1.95, r * 0.62, -0.38, 0, Math.PI); ctx.stroke(); }
   } else {
     ctx.save(); ctx.translate(x, y); ctx.rotate(o.axis || 0);
     ctx.globalAlpha = a; ctx.drawImage(LOOK[b], -r, -r, 2 * r, 2 * r);
@@ -1096,7 +1117,7 @@ function drawOverlay(t) {
 /* ---------------- planet index ---------------- */
 $("index").innerHTML = PLANETS.map(b => {
   const s = Math.round(clamp(P[b].r * 0.9, 7, 15)), node = b === "Rahu" || b === "Ketu";
-  return `<button class="chip" type="button" id="ix-${b}" data-b="${b}" aria-pressed="false" title="Turn the sky towards ${b}"><span class="d" style="width:${s}px;height:${s}px;background:${P[b].col}${LOOK_URL[b] ? ` url(${LOOK_URL[b]}) center/cover` : ""}"></span>${b}<span class="rx" hidden>R</span></button>`;
+  return `<button class="chip" type="button" id="ix-${b}" data-b="${b}" aria-pressed="false" title="Turn the sky towards ${b}"><span class="d" style="width:${s}px;height:${s}px;background:${VIVID[b] ? `linear-gradient(135deg,${VIVID[b].join(",")})` : P[b].col + (LOOK_URL[b] ? ` url(${LOOK_URL[b]}) center/cover` : "")}"></span>${b}<span class="rx" hidden>R</span></button>`;
 }).join("");
 $("index").addEventListener("click", e => {
   const c = e.target.closest(".chip"); if (!c) return; const b = c.dataset.b;
