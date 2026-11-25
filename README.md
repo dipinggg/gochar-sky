@@ -6,6 +6,7 @@ A live Vedic *gochar* (transit) sky that runs in your browser. It shows the real
 
 ## What it does
 
+- **Planets that look the part.** Soft painted versions of the real bodies: Jupiter's bands and Great Red Spot, Saturn's rings at their real tilt, Mars's polar cap, the Moon's maria. Each is lit from the Sun's real direction, so the Moon, Venus, Mercury and Mars show their true phases. Each glow follows the planet's live brightness (apparent magnitude) and breathes slowly, because planets shine steadily rather than twinkling.
 - **Real sky, live.** Over 5,000 stars, the Milky Way and the constellations, turning in real time over the place you choose.
 - **Vedic overlay.** Sidereal signs (Lahiri ayanamsa) as soft bands with whole-sign house numbers from your Lagna, plus optional nakshatras and their junction stars.
 - **Your chart.** Enter a name, birth date, birth time and birth place (any town worldwide). Your birth planets appear as faint discs fixed among the stars, and today's planets appear in full colour. A close contact (a planet within 3° of a birth planet) pulses.
