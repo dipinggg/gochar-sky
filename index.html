@@ -932,6 +932,18 @@ function radiusOf(b, vec) {
 }
 // screen angle that turns a body's own "up" towards ecliptic north, so bands, poles and rings sit the right way
 function axisAt(lon, lat, p) { const q = pECL(lon, lat + 0.5); return q && p ? Math.atan2(q[1] - p[1], q[0] - p[0]) + Math.PI / 2 : 0; }
+// Saturn's ring revolving: bright ring particles travel round the same ellipse (one lap about every 9 seconds)
+function ringDots(ctx, x, y, r, a, t, front) {
+  const n = 26, spin = (t / 9000) * 6.2832, c = Math.cos(-0.38), s = Math.sin(-0.38), rx = r * 1.95, ry = r * 0.62, sz = Math.max(0.8, r * 0.085);
+  ctx.fillStyle = "#EEF1FF";
+  for (let i = 0; i < n; i++) {
+    const ang = i * 6.2832 / n + spin + (i % 3) * 0.07, sy = Math.sin(ang);
+    if ((sy > 0) !== front) continue;
+    const ex = rx * Math.cos(ang), ey = ry * sy, px = x + ex * c - ey * s, py = y + ex * s + ey * c;
+    ctx.globalAlpha = a * (front ? 0.85 : 0.45) * (0.55 + 0.45 * Math.abs(Math.cos(ang)));   // brighter at the ring's tips and in front
+    ctx.beginPath(); ctx.arc(px, py, sz * (i % 4 === 0 ? 1.35 : 1), 0, 6.2832); ctx.fill();
+  }
+}
 // Draw one body. opts: {alpha, birth, k (lit fraction), limb (screen angle towards the Sun), axis, mag, alt, t}
 function drawBody(ctx, b, x, y, r, o) {
   const a = o.alpha, node = b === "Rahu" || b === "Ketu", flat = FLAT.has(b);
@@ -959,6 +971,7 @@ function drawBody(ctx, b, x, y, r, o) {
     if (b === "Saturn") {
       ring = ctx.createLinearGradient(x - r * 1.95, y, x + r * 1.95, y); ring.addColorStop(0, "#9DB0FF"); ring.addColorStop(0.5, "#DCE3FF"); ring.addColorStop(1, "#8C8CFF");
       ctx.globalAlpha = a * 0.9; ctx.strokeStyle = ring; ctx.lineWidth = Math.max(1.2, r * 0.22); ctx.beginPath(); ctx.ellipse(x, y, r * 1.95, r * 0.62, -0.38, Math.PI, 2 * Math.PI); ctx.stroke();
+      if (o.t !== undefined) ringDots(ctx, x, y, r, a, o.t, false);   // far side of the turning ring, behind the globe
     }
     const gr = ctx.createLinearGradient(x + lx * r * 0.85, y + ly * r * 0.85, x - lx * r, y - ly * r);
     gr.addColorStop(0, lt); gr.addColorStop(0.5, mid); gr.addColorStop(1, dk);
@@ -968,7 +981,7 @@ function drawBody(ctx, b, x, y, r, o) {
     const hx = x + lx * r * 0.45, hy = y + ly * r * 0.45, hl = ctx.createRadialGradient(hx, hy, 0, hx, hy, r * 1.05);   // soft light on the near side
     hl.addColorStop(0, "rgba(255,255,255,.3)"); hl.addColorStop(1, "rgba(255,255,255,0)"); ctx.fillStyle = hl; ctx.fillRect(x - r, y - r, 2 * r, 2 * r);
     ctx.restore();
-    if (ring) { ctx.globalAlpha = a * 0.95; ctx.strokeStyle = ring; ctx.beginPath(); ctx.ellipse(x, y, r * 1.95, r * 0.62, -0.38, 0, Math.PI); ctx.stroke(); }
+    if (ring) { ctx.globalAlpha = a * 0.95; ctx.strokeStyle = ring; ctx.beginPath(); ctx.ellipse(x, y, r * 1.95, r * 0.62, -0.38, 0, Math.PI); ctx.stroke(); if (o.t !== undefined) ringDots(ctx, x, y, r, a, o.t, true); }
   } else {
     ctx.save(); ctx.translate(x, y); ctx.rotate(o.axis || 0);
     ctx.globalAlpha = a; ctx.drawImage(LOOK[b], -r, -r, 2 * r, 2 * r);
