@@ -55,7 +55,9 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 .iconbtn:hover{border-color:var(--edge-hi)}
 .iconbtn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .iconbtn[aria-pressed="true"]{border-color:rgba(233,201,135,.7);color:var(--gold)}
-.topbtns{display:flex;gap:8px;align-items:center}
+.topbtns{display:flex;gap:8px;align-items:stretch}
+#toggle{justify-content:center;padding-left:10px;padding-right:10px}
+#toggle[aria-expanded="true"]{background:linear-gradient(160deg,rgba(233,201,135,.34),rgba(233,201,135,.14)),rgba(14,13,44,.5);color:#FFE7B8}
 .hvarrow{display:flex;flex-direction:column;align-items:center;gap:3px;width:70px;padding:10px 4px 9px;border-radius:var(--rad);cursor:pointer;color:var(--ink);z-index:3}
 .hvarrow:hover{border-color:var(--edge-hi)}
 .hvarrow span{font-family:var(--f-display);font-size:2.1rem;line-height:.9}
@@ -280,6 +282,7 @@ kbd{border:0;background:rgba(255,255,255,.12);box-shadow:0 2px 0 rgba(0,0,0,.4)}
   .toast{top:104px}
   .iconbtn{padding:7px 9px}
   .iconbtn #houses-l,.iconbtn #mychart-l{display:none}
+  #toggle{padding-left:9px;padding-right:9px}
   .hvarrow{width:50px;padding:8px 2px}
   .hvarrow span{font-size:1.7rem}
   .hvarrow small{font-size:.6rem}
@@ -313,8 +316,8 @@ kbd{border:0;background:rgba(255,255,255,.12);box-shadow:0 2px 0 rgba(0,0,0,.4)}
       <button class="iconbtn glass" id="houses" type="button" aria-pressed="false" title="See three houses at a time, level and upright">
         <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="7" width="5.5" height="10" rx="1"/><rect x="9.25" y="5.5" width="5.5" height="13" rx="1"/><rect x="16" y="7" width="5.5" height="10" rx="1"/></svg><span id="houses-l">House view</span>
       </button>
-      <button class="iconbtn glass" id="toggle" type="button" aria-controls="panel" aria-expanded="false">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg>Filters
+      <button class="iconbtn glass" id="toggle" type="button" aria-controls="panel" aria-expanded="false" aria-label="Filters" title="Filters (F)">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg>
       </button>
     </div>
   </div>
