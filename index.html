@@ -1319,11 +1319,18 @@ function hvArea(now) {
 const hvPanelCovers = () => W < 760 && !$("panel").hidden;   // phone: the bottom sheet covers House view
 function hvS() { const w = hvAreaW || W; return Math.max(60, w / 2 - (w < 600 ? 52 : 70)) / (2 * Math.tan(26 * DEG)); }
 function hvBasis(lamSid) { return {f: mul(F.EQJ_HOR, eclToEQJ(F, lamSid, 0)), u: mul(F.EQJ_HOR, mul(F.ECT_EQJ, [0, 0, 1])), S: hvS() * hvZF(hvZ)}; }
+/* Moving between houses. While a finger drags, the band follows it 1:1 (hv.drag). Steps glide with an
+   ease-out that starts at full speed, so a tap on an arrow answers at once; after a swipe the glide starts
+   at the finger's own speed, so there is no jolt between dragging and settling. */
+let hvPxDeg = 6;   // screen pixels per degree in the house frame (set each frame)
 function hvLam(now) {
+  if (hv.drag) return hv.drag.lam;
   if (!hv.nav) return hv.lam;
-  const k = clamp((now - hv.nav.t0) / hv.nav.dur, 0, 1);
-  if (k >= 1) { hv.lam = hv.nav.to; hv.nav = null; return hv.lam; }
-  return hv.nav.from + (hv.nav.to - hv.nav.from) * ease(k);
+  const n = hv.nav, k = clamp((now - n.t0) / n.dur, 0, 1);
+  if (k >= 1) { hv.lam = n.to; hv.nav = null; return hv.lam; }
+  if (n.v == null) return n.from + (n.to - n.from) * ease(k);
+  // cubic Hermite from the start speed (n.v, as a share of the distance per duration) down to rest
+  return n.from + (n.to - n.from) * ((3 * k * k - 2 * k * k * k) + n.v * (k - 2 * k * k + k * k * k));
 }
 let hvPrevCam = "";
 function houseCam(now) {
@@ -1361,20 +1368,42 @@ function exitHV() {
   view.az = aa.az; view.alt = clamp(aa.alt, -70, 85); view.fov = zoomTarget = 100;
   if (REDUCED) { hv = null; hvAmt = 0; markHV(); return; }
   const c = camera(view.az, view.alt, view.fov, W, H);
-  hv.lam = lam; hv.nav = null; hv.mode = "exit"; hv.t0 = now; hv.dur = 800; hv.to = {f: c.C[2], u: c.C[1], S: c.S};
+  hv.lam = lam; hv.nav = null; hv.drag = null; hv.mode = "exit"; hv.t0 = now; hv.dur = 800; hv.to = {f: c.C[2], u: c.C[1], S: c.S};
   markHV();
 }
 function hvStep(dir) {   // +1: the house on the left comes to the centre; -1: the one on the right
   if (!hv || hv.mode === "exit") return;
-  const now = performance.now(), target = (hv.nav ? hv.nav.to : hv.lam) + dir * 30;
+  const now = performance.now(), from = hvLam(now); if (hv.drag) { hv.lam = hv.drag.base; hv.drag = null; }
+  const target = (hv.nav ? hv.nav.to : hv.lam) + dir * 30;
   if (REDUCED) { hv.lam = target; hv.nav = null; return; }
-  hv.nav = {from: hvLam(now), to: target, t0: now, dur: 650};
+  hv.nav = {from, to: target, t0: now, dur: 430, v: 1.8};
+}
+function hvDragStart(x) {
+  const now = performance.now(), cur = hvLam(now), base = Math.round((cur - 15) / 30) * 30 + 15;
+  hv.nav = null; hv.lam = base; hv.drag = {base, lam0: cur, x0: x, lam: cur, s: []};
+}
+// times come from the input events themselves, so a busy frame on a slow phone does not hide a flick
+function hvDragMove(x, t) {
+  const d0 = hv.drag; let d = d0.lam0 + (x - d0.x0) / hvPxDeg - d0.base;
+  if (Math.abs(d) > 30) d = Math.sign(d) * Math.min(38, 30 + (Math.abs(d) - 30) * 0.3);   // one house per swipe: past it, it resists
+  d0.lam = d0.base + d; d0.s.push({t, lam: d0.lam}); while (d0.s.length > 2 && t - d0.s[0].t > 120) d0.s.shift();
+}
+function hvDragEnd(tUp, tDown) {
+  const d0 = hv.drag, now = performance.now(); hv.drag = null; if (!d0) return;
+  const a = d0.s[0] || {t: tUp, lam: d0.lam}, b = d0.s[d0.s.length - 1] || a, v = tUp - b.t > 100 ? 0 : (b.lam - a.lam) / Math.max(8, b.t - a.t);   // degrees per ms
+  const d = d0.lam - d0.base, ahead = d + clamp(v, -0.12, 0.12) * 140, flick = tUp - tDown < 280 && Math.abs(d) * hvPxDeg > 24;   // a quick swipe always moves on
+  const dir = flick ? Math.sign(d) : Math.abs(ahead) > 8 && Math.abs(d) * hvPxDeg >= 18 ? Math.sign(ahead) : 0, target = d0.base + dir * 30, dist = target - d0.lam;
+  hv.lam = target;
+  if (REDUCED || Math.abs(dist) < 0.05) { hv.nav = null; return; }
+  const dur = clamp(150 + 9 * Math.abs(dist), 170, 430), vn = Math.sign(v) === Math.sign(dist) ? clamp(v * dur / dist, 1.2, 2.6) : 0.8;
+  hv.nav = {from: d0.lam, to: target, t0: now, dur, v: vn};
 }
 function hvGoTo(sign) {
   if (!hv || hv.mode === "exit") { enterHV(sign); return; }
-  const cur = hv.nav ? hv.nav.to : hv.lam, target = cur + norm180(sign * 30 + 15 - cur), now = performance.now();
+  const now = performance.now(), from = hvLam(now); if (hv.drag) { hv.lam = hv.drag.base; hv.drag = null; }
+  const cur = hv.nav ? hv.nav.to : hv.lam, target = cur + norm180(sign * 30 + 15 - cur);
   if (REDUCED) { hv.lam = target; hv.nav = null; return; }
-  hv.nav = {from: hvLam(now), to: target, t0: now, dur: 750};
+  hv.nav = {from, to: target, t0: now, dur: 750};
 }
 function hvZoomNow(now) {
   if (!hv) return 0;
@@ -1422,7 +1451,7 @@ function drawHouseFrame(ctx) {
   const pl = pECL(lam + half, 0), pr = pECL(lam - half, 0), pt = pECL(lam, latH), pb = pECL(lam, -latH);
   if (!pl || !pr || !pt || !pb) return;
   const x0 = Math.min(pl[0], pr[0]), x1 = Math.max(pl[0], pr[0]), y0 = Math.min(pt[1], pb[1]), y1 = Math.max(pt[1], pb[1]), a = hvAmt;
-  const zl = hvZl(), tall = y1 - y0 > 140, pxDeg = (x1 - x0) / (2 * half), rulerBelow = zl > 0 && pxDeg * 5 >= 34;
+  const zl = hvZl(), tall = y1 - y0 > 140, pxDeg = (x1 - x0) / (2 * half); hvPxDeg = Math.max(1, pxDeg); const rulerBelow = zl > 0 && pxDeg * 5 >= 34;
   ctx.globalAlpha = a;
   // no outline and no dimming outside: the frame area sits on the same sky as everything around it
   // degree scale along the bottom edge: a long tick at each sign boundary, 10° and 20° marked;
@@ -1981,7 +2010,7 @@ function keyMove(dt) {
   if (Math.abs(keyVel.zoom) > 1e-7) { zoomAnchor = null; view.fov = zoomTarget = clamp(view.fov * Math.exp(-keyVel.zoom * dt), 12, 175); }
 }
 function updateView(dt) {
-  if (hv) { if (hv.mode !== "on" || hv.nav) { skyDirty = true; trailReset = true; } return; }   // house view drives the camera
+  if (hv) { if (hv.mode !== "on" || hv.nav || hv.drag) { skyDirty = true; trailReset = true; } return; }   // house view drives the camera
   if (fly) {
     const k = Math.min(1, (performance.now() - fly.t0) / fly.dur), e = ease(k);
     view.az = norm360(fly.az0 + fly.daz * e); view.alt = fly.alt0 + (fly.alt1 - fly.alt0) * e;
@@ -2045,7 +2074,8 @@ ov.addEventListener("pointerdown", e => {
   ov.setPointerCapture(e.pointerId); const p = localXY(e); ptrs.set(e.pointerId, p);
   fly = null; vel = {az: 0, alt: 0}; zoomAnchor = null; zoomTarget = view.fov; samples = []; moved = 0;
   if (hv) {
-    if (ptrs.size === 1) gesture = {type: "hv", x0: p[0], y0: p[1], stepped: false};
+    if (ptrs.size === 1) gesture = {type: "hv", x0: p[0], y0: p[1], axis: null, t0: e.timeStamp};
+    else if (hv.drag) hvDragEnd(e.timeStamp, e.timeStamp);
     else if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; gesture = {type: "hvpinch", d: Math.max(20, Math.hypot(a[0] - b[0], a[1] - b[1])), z0: hvZoomNow(performance.now())}; $("tip").hidden = true; }
     return;
   }
@@ -2064,7 +2094,8 @@ ov.addEventListener("pointermove", e => {
   if (gesture && gesture.type === "hv") {   // one swipe = one house: right brings in the house on the left, left the one on the right
     if (moved > 4) $("tip").hidden = true;
     const dx = p[0] - gesture.x0, dy = p[1] - gesture.y0;
-    if (!gesture.stepped && Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) { hvStep(dx > 0 ? 1 : -1); gesture.stepped = true; }
+    if (!gesture.axis && Math.hypot(dx, dy) > 6) { gesture.axis = Math.abs(dx) >= Math.abs(dy) ? "x" : "y"; if (gesture.axis === "x" && hv.mode === "on") hvDragStart(p[0]); }
+    if (gesture.axis === "x" && hv.drag) hvDragMove(p[0], e.timeStamp);
     return;
   }
   if (gesture && gesture.type === "pinch" && ptrs.size >= 2) {
@@ -2085,7 +2116,7 @@ ov.addEventListener("pointermove", e => {
 function endPtr(e) {
   const p = localXY(e); ptrs.delete(e.pointerId);
   if (gesture && gesture.type === "hvpinch") { if (!gesture.done) { gesture.done = true; hvZoomSettle(gesture.z0); } if (ptrs.size === 0) gesture = null; return; }
-  if (gesture && gesture.type === "hv") { if (ptrs.size === 0) { if (moved <= 4) hvTap(p); gesture = null; } return; }
+  if (gesture && gesture.type === "hv") { if (ptrs.size === 0) { if (hv && hv.drag) hvDragEnd(e.timeStamp, gesture.t0); else if (moved <= 4) hvTap(p); gesture = null; } return; }
   if (ptrs.size === 1 && gesture && gesture.type === "pinch") { gesture = {type: "pan"}; samples = []; return; }
   if (ptrs.size > 0) return;
   if (dragging) {
