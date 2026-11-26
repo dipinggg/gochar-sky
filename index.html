@@ -818,42 +818,42 @@ function paintGradient(ctx, alpha) {
   return day;
 }
 function trailsActive() { return layers.trails && !hv && !dragging && !jump && !live && Math.abs(rate) >= 3600; }
-/* A living sky, drawn on top of the still star layer: the Milky Way's brighter clouds glow in slow drifting waves,
-   and the bright stars twinkle, a little more near the horizon where the air is thicker. */
-const LIVE_MW = [], LIVE_STARS = [];
-for (let i = 0; i < NMW; i++) if (MLV[i] >= 4) LIVE_MW.push(i);
-for (let i = 0; i < NS; i++) if (SMAG[i] < 2.3) LIVE_STARS.push(i);
-const MW_PHASE = new Float32Array(NMW); for (const i of LIVE_MW) MW_PHASE[i] = MW[i][0] * 0.045 + MW[i][1] * 0.07 + ((i * 2.399) % 1) * 0.8;
-function drawSkyLife(ctx, t) {
-  if (trailsActive() || dragging) return;
-  const day = dayFactor(); if (day > 0.6) return;
-  const night = 1 - day, zk = clamp(Math.sqrt(110 / view.fov), 0.8, 2.6);
-  ctx.globalCompositeOperation = "lighter";
-  if (layers.mw) {
-    const ang = 1.3 * DEG * cam.S;
-    for (const i of LIVE_MW) {
-      const c = mul(T, [MV[i*3], MV[i*3+1], MV[i*3+2]]); if (c[2] < -0.6) continue;
-      const k = 2 / (1 + c[2]), x = cam.cx + c[0] * k * cam.S, y = cam.cy - c[1] * k * cam.S, sz = ang * k * (0.8 + MLV[i] * 0.12) * 1.25;
-      if (x < -sz || x > W + sz || y < -sz || y > H + sz) continue;
-      const w = Math.sin(t * 0.00045 + MW_PHASE[i]); if (w <= 0) continue;   // bright patches drift slowly through the clouds
-      ctx.globalAlpha = w * w * (0.02 + MLV[i] * 0.008) * night;
-      ctx.drawImage(MW_SPRITE, x - sz, y - sz, 2 * sz, 2 * sz);
-    }
-  }
-  for (const i of LIVE_STARS) {
-    const v = [SV[i*3], SV[i*3+1], SV[i*3+2]], c = mul(T, v); if (c[2] < -0.85) continue;
+/* Star dust: fine faint specks scattered through the Milky Way and around the bright stars. They are painted with the
+   still star layer; about one in nine also glows softly in and out on the layer above. */
+const DUST = [], DUST_LIVE = [];
+(() => {
+  let seed = 20240917; const rnd = () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296);
+  const jitter = (v, R, pow) => {
+    let u = Math.abs(v[2]) < 0.9 ? [-v[1], v[0], 0] : [0, -v[2], v[1]]; const ul = Math.hypot(...u); u = u.map(q => q / ul);
+    const w = [v[1] * u[2] - v[2] * u[1], v[2] * u[0] - v[0] * u[2], v[0] * u[1] - v[1] * u[0]], d = R * DEG * Math.pow(rnd(), pow), th = rnd() * 6.2832;
+    const p = [v[0] + (u[0] * Math.cos(th) + w[0] * Math.sin(th)) * d, v[1] + (u[1] * Math.cos(th) + w[1] * Math.sin(th)) * d, v[2] + (u[2] * Math.cos(th) + w[2] * Math.sin(th)) * d];
+    const l = Math.hypot(...p); return p.map(q => q / l);
+  };
+  const cols = ["228,230,255", "200,208,255", "255,226,238", "214,236,255"];
+  const add = (v, a, sz) => { const k = DUST.length; DUST.push({v, a, sz, col: cols[k % 4], ph: rnd() * 6.2832, f: 0.0011 + rnd() * 0.0012}); if (k % 9 === 4) DUST_LIVE.push(k); };
+  for (let n = 0; n < 3200; n++) { const i = Math.floor(rnd() * NMW); if (MLV[i] < 2 && rnd() < 0.6) { n--; continue; } add(jitter([MV[i*3], MV[i*3+1], MV[i*3+2]], 2.4, 0.7), 0.12 + rnd() * 0.22 + MLV[i] * 0.03, rnd() < 0.85 ? 0.7 : 1.15); }
+  for (let i = 0; i < NS; i++) if (SMAG[i] < 2.3) { const m = Math.round(26 - SMAG[i] * 6); for (let j = 0; j < m; j++) add(jitter([SV[i*3], SV[i*3+1], SV[i*3+2]], 1.6, 1.6), 0.14 + rnd() * 0.26, rnd() < 0.8 ? 0.7 : 1.1); }
+})();
+function paintDust(ctx, dim) {
+  for (const d of DUST) {
+    const c = mul(T, d.v); if (c[2] < -0.6) continue;
     const k = 2 / (1 + c[2]), x = cam.cx + c[0] * k * cam.S, y = cam.cy - c[1] * k * cam.S;
-    if (x < -30 || x > W + 30 || y < -30 || y > H + 30) continue;
-    const mag = SMAG[i], alt = Math.asin(clamp(mul(F.EQJ_HOR, v)[2], -1, 1)) / DEG; if (alt < -1 && !hv) continue;
-    const low = clamp(1 - alt / 25, 0, 1), f = 0.0021 + (i % 7) * 0.00042;
-    const tw = 0.62 + (0.28 + 0.18 * low) * Math.sin(t * f + i * 1.7) * (0.7 + 0.3 * Math.sin(t * f * 2.7 + i));   // twinkle
-    const col = SCOL[i], g = (5 - mag) * 2.1 * zk;
-    ctx.globalAlpha = 0.26 * tw * night * (hv ? 0.8 : 1);
+    if (x < 0 || x > W || y < 0 || y > H) continue;
+    ctx.globalAlpha = d.a * dim; ctx.fillStyle = `rgb(${d.col})`; ctx.fillRect(x - d.sz / 2, y - d.sz / 2, d.sz, d.sz);
+  }
+  ctx.globalAlpha = 1;
+}
+function drawDustGlow(ctx, t) {   // some specks glow in and out
+  if (!layers.mw || trailsActive() || dragging) return;
+  const day = dayFactor(); if (day > 0.6) return;
+  ctx.globalCompositeOperation = "lighter";
+  for (const i of DUST_LIVE) {
+    const d = DUST[i], c = mul(T, d.v); if (c[2] < -0.6) continue;
+    const k = 2 / (1 + c[2]), x = cam.cx + c[0] * k * cam.S, y = cam.cy - c[1] * k * cam.S;
+    if (x < -4 || x > W + 4 || y < -4 || y > H + 4) continue;
+    const w = Math.sin(t * d.f + d.ph); if (w <= 0.15) continue;
+    const g = 2.2 + 1.6 * w; ctx.globalAlpha = w * w * 0.55 * (1 - day);
     ctx.drawImage(STAR_GLOW, x - g, y - g, 2 * g, 2 * g);
-    if (mag < 0.9) {   // a faint sparkle on the very brightest stars
-      const L = g * 1.6 * tw; ctx.globalAlpha = 0.22 * tw * night; ctx.strokeStyle = `rgb(${col[0]},${col[1]},${col[2]})`; ctx.lineWidth = 0.8;
-      ctx.beginPath(); ctx.moveTo(x - L, y); ctx.lineTo(x + L, y); ctx.moveTo(x, y - L); ctx.lineTo(x, y + L); ctx.stroke();
-    }
   }
   ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
 }
@@ -875,6 +875,7 @@ function drawSky(trails) {
     }
     ctx.globalAlpha = 1;
   }
+  if (layers.mw && day < 0.6 && !trails) paintDust(ctx, 1 - day);
   ctx.globalCompositeOperation = trails ? "lighter" : "source-over";
   for (let i = 0; i < NS; i++) {
     const mag = SMAG[i];
@@ -1057,7 +1058,7 @@ function drawOverlay(t) {
   const under = hor => !hv && layers.ground && hor[2] < -0.004 && groundAlpha() > 0.95;
 
   drawAurora(ctx, t);
-  drawSkyLife(ctx, t);
+  drawDustGlow(ctx, t);
 
   if (layers.grid) {
     ctx.strokeStyle = "rgba(160,150,255,.12)"; ctx.lineWidth = 1;
