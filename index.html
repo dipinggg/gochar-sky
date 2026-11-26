@@ -246,6 +246,16 @@ kbd{border:0;background:rgba(255,255,255,.12);box-shadow:0 2px 0 rgba(0,0,0,.4)}
 .verdict-s{font-size:.66rem;font-weight:700;padding:1px 7px;border-radius:var(--rad-s);margin-left:auto}
 .verdict-s.good{color:var(--good);background:rgba(134,217,168,.16)} .verdict-s.bad{color:var(--warn);background:rgba(242,196,107,.16)} .verdict-s.mixed{color:var(--gold);background:rgba(233,201,135,.16)}
 
+
+/* the info card opens short: the status right now; the full reading appears only when expanded */
+.hvi-brief p{margin:7px 0 0;line-height:1.55}
+.hvi-brief .verdict-s{margin-left:6px;vertical-align:1px}
+.hvi-more{margin-left:4px;border:0;background:var(--fill);color:var(--ink);font:inherit;font-size:.76rem;font-weight:600;padding:2px 10px;border-radius:999px;cursor:pointer;white-space:nowrap;vertical-align:1px}
+.hvi-more:hover{background:var(--fill-hi)}
+.hvinfo:not(.big) .hvi-full{display:none}
+.hvinfo:not(.big) .hvi-brief p:first-child{margin-top:5px}
+.hvinfo.big .hvi-brief{display:none}
+
 @media (max-width:760px){
   .top{grid-template-columns:minmax(0,1fr) auto;row-gap:8px}
   .brand h1{font-size:1.15rem}
@@ -275,6 +285,10 @@ kbd{border:0;background:rgba(255,255,255,.12);box-shadow:0 2px 0 rgba(0,0,0,.4)}
   .hvarrow small{font-size:.6rem}
   .hvi-grid{grid-template-columns:1fr}
   .hvi-cols{grid-template-columns:1fr}
+  .hvinfo:not(.big) .hvi-head .tag{display:none}
+  .hvinfo:not(.big){padding:12px 16px}
+  .hvi-brief p{font-size:.84rem;line-height:1.42;margin-top:4px}
+  .hvinfo:not(.big) .hvi-head b{font-size:1.15rem}
   .hvinfo .rows{grid-template-columns:1fr;gap:1px;margin-left:12px} .hvinfo .rows dd{margin-bottom:5px}
   .hvi-side{flex-direction:column;gap:4px}
   .hvi-side .r{text-align:left}
@@ -1470,9 +1484,10 @@ function drawHouseFrame(ctx) {
     const cy = (y0 + y1) / 2, Lb = $("hv-left"), Rb = $("hv-right"), Xc = $("hv-ctrl");
     Lb.style.left = Math.max(6, x0 - Lb.offsetWidth - 10) + "px"; Lb.style.top = (cy - Lb.offsetHeight / 2) + "px";
     Rb.style.left = Math.min((hvAreaW || W) - Rb.offsetWidth - 6, x1 + 10) + "px"; Rb.style.top = (cy - Rb.offsetHeight / 2) + "px";
-    const ctrlTop = Math.max(6, y0 - Xc.offsetHeight - 10);
-    Xc.style.left = Math.max(6, x1 - Xc.offsetWidth) + "px"; Xc.style.top = ctrlTop + "px";
-    if (!covered) placeInsights(x0, x1, ctrlTop, cs);
+    const narrowHV = (hvAreaW || W) < 760;
+    const ctrlTop = narrowHV ? Rb.offsetTop + Rb.offsetHeight + 10 : Math.max(6, y0 - Xc.offsetHeight - 10);
+    Xc.style.left = (narrowHV ? Rb.offsetLeft + (Rb.offsetWidth - Xc.offsetWidth) / 2 : Math.max(6, x1 - Xc.offsetWidth)) + "px"; Xc.style.top = ctrlTop + "px";
+    if (!covered) placeInsights(x0, x1, narrowHV ? y0 - 2 : ctrlTop, cs);
     const ls = ((cs + 1) % 12 + 12) % 12, rs = ((cs + 11) % 12);
     Lb.setAttribute("aria-label", `Show house ${houseNo(ls)}, ${signFull(ls)}`); Rb.setAttribute("aria-label", `Show house ${houseNo(rs)}, ${signFull(rs)}`);
   }
@@ -1810,7 +1825,15 @@ function overviewHTML(tp, da) {
   const sum = {"Well supported": "Overall this is a supportive phase: a good time to start things and push forward.", "Leaning good": "Overall the phase leans your way; steady effort is rewarded.",
     "Mixed": "Overall the phase is mixed: some areas open up while others need patience.", "Some pressure": "Overall the phase asks for patience: keep routines steady and avoid big risks.",
     "Under pressure": "Overall this is a testing phase: slow down, look after health and money, and build quietly."}[V[0]];
-  const html = {V, body: `<p class="hvi-ovsum">${sum}</p>${rowsHTML(items)}`};
+  // the short version: overall tone, the period, and the one transit that matters most
+  const brief = [`<span class="${V[1]}">` + {"Well supported": "A supportive phase: a good time to start things.", "Leaning good": "The phase leans your way; steady effort pays.",
+    "Mixed": "A mixed phase: some areas open up, others need patience.", "Some pressure": "A phase that asks for patience: keep routines steady, avoid big risks.",
+    "Under pressure": "A testing phase: slow down and look after health and money."}[V[0]] + "</span>"];
+  if (da) brief.push(`Dasha: <b>${da.md}–${da.ad}</b> (until ${fmtDay(da.adEnd)}).`);
+  const sn = fromMoon(bodies.Saturn.lon), jn = fromMoon(bodies.Jupiter.lon), jGood = GOOD_FROM_MOON.Jupiter.includes(jn);
+  const phase = {12: "the first part of Sade Sati", 1: "the peak of Sade Sati", 2: "the last part of Sade Sati", 8: "Ashtama Shani (Saturn 8th from your Moon)", 4: "Kantaka Shani (Saturn 4th from your Moon)"}[sn];
+  brief.push(`Saturn: ${phase ? `<span class="bad">${phase}</span>` : GOOD_FROM_MOON.Saturn.includes(sn) ? '<span class="good">helpful</span>' : "neutral"}; Jupiter: ${jGood ? '<span class="good">supportive</span>' : '<span class="bad">not supportive</span>'} (from your Moon).`);
+  const html = {V, body: `<p class="hvi-ovsum">${sum}</p>${rowsHTML(items)}`, brief: brief.join(" ")};
   ovCache.key = key; ovCache.html = html; return html;
 }
 function insightsHTML(s, tp) {
@@ -1883,14 +1906,20 @@ function insightsHTML(s, tp) {
   }
   const nowSecs = planetSecs || `<p class="m" style="margin:4px 0">No planet is passing through this house right now.</p>`;
   const xIcon = insBig ? '<path d="M9 4v5H4"/><path d="M15 20v-5h5"/><path d="M4 4l5 5"/><path d="M20 20l-5-5"/>' : '<path d="M4 9V4h5"/><path d="M20 15v5h-5"/><path d="M4 4l6 6"/><path d="M20 20l-6-6"/>';
+  const ov = overviewHTML(tp, da);
+  const brief1 = {"Well supported": "A good time to move forward here.", "Leaning good": "Steady action here pays off.", "Mixed": "Take things here step by step.",
+    "Some pressure": "Go gently here; patience works best.", "Under pressure": "Slow down here and avoid big risks."}[V[0]];
+  const here = `<b>This house</b> (${short}): ${now.length ? `${listNames(now.map(b => `${dot(b)}${b}`))} passing through` : "no planet passing through"}, <span class="${V[1]}">${V[0].toLowerCase()}</span>. ${brief1}`;
   return `<div class="hvi-head"><b>House ${h}</b><span>${signFull(s)}</span><span class="tag">${bhava}</span><span class="verdict ${V[1]}">${V[0]}</span><button class="hvi-x" type="button" data-act="expand" aria-label="${insBig ? "Make the reading smaller" : "Expand the reading"}" title="${insBig ? "Smaller" : "Expand"}"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${xIcon}</svg></button></div>
+  <div class="hvi-brief"><p><b>Right now:</b> ${ov.brief}</p><p>${here} <button class="hvi-more" type="button" data-act="expand">Full reading <span aria-hidden="true">›</span></button></p></div>
+  <div class="hvi-full">
   <p class="hvi-sig">Signifies ${sig}.</p>
   <p class="hvi-now">${pic.join(" ")}</p>
-  ${(() => { const ov = overviewHTML(tp, da); return section("overview", `<b>This chart right now</b> <span class="m">· ${esc(person.name)}${da ? ` · ${da.md}–${da.ad}` : ""}</span> <span class="verdict-s ${ov.V[1]}">${ov.V[0]}</span>`, ov.body, true); })()}
+  ${(() => { return section("overview", `<b>This chart right now</b> <span class="m">· ${esc(person.name)}${da ? ` · ${da.md}–${da.ad}` : ""}</span> <span class="verdict-s ${ov.V[1]}">${ov.V[0]}</span>`, ov.body, true); })()}
   <div class="hvi-cols"><div><h3>Planets here now</h3>${nowSecs}</div>
   <div><h3>What shapes this house</h3>${section("infl", "Combinations, aspects and support", `<ul>${infl.join("")}</ul>`, !now.length)}${section("birth", `Birth chart and dasha${da ? ` <span class="m">· ${da.md}–${da.ad}</span>` : ""}`, `<ul>${bl.filter(Boolean).map(x => `<li>${x}</li>`).join("")}</ul>`, false)}</div></div>
   <div class="hvi-side">${sideLine((s + 1) % 12, "l")}${sideLine((s + 11) % 12, "r")}</div>
-  <p class="hvi-foot">Based on classical rules from Phaladeepika and Brihat Parashara Hora Shastra (transits from the Moon, vedha, Ashtakavarga, dignity, nakshatras, Vimshottari dasha). These are traditional readings, not certainties.</p>`;
+  <p class="hvi-foot">Based on classical rules from Phaladeepika and Brihat Parashara Hora Shastra (transits from the Moon, vedha, Ashtakavarga, dignity, nakshatras, Vimshottari dasha). These are traditional readings, not certainties.</p></div>`;
 }
 
 let insKey = "", insT = 0, insState = "closed";
