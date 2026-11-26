@@ -1195,8 +1195,11 @@ function hvLam(now) {
   if (k >= 1) { hv.lam = hv.nav.to; hv.nav = null; return hv.lam; }
   return hv.nav.from + (hv.nav.to - hv.nav.from) * ease(k);
 }
+let hvPrevCam = "";
 function houseCam(now) {
   hvZ = hvZoomNow(now); const aw = hvArea(now);
+  const csig = hvZ.toFixed(4) + "|" + aw.toFixed(1);   // zooming or making room for the panel moves the stars too
+  if (csig !== hvPrevCam) { hvPrevCam = csig; skyDirty = true; trailReset = true; }
   const tgt = hvBasis(hvLam(now));
   if (hv.mode === "on") { hvAmt = 1; return cameraBasis(tgt.f, tgt.u, tgt.S, aw, H); }
   const k = clamp((now - hv.t0) / hv.dur, 0, 1), e = ease(k);
@@ -1245,17 +1248,24 @@ function hvGoTo(sign) {
 function hvZoomNow(now) {
   if (!hv) return 0;
   if (hv.zt) { const k = clamp((now - hv.zt.t0) / hv.zt.dur, 0, 1); hv.z = hv.zt.from + (hv.zt.to - hv.zt.from) * ease(k); if (k >= 1) hv.zt = null; }
+  else if (hv.zGoal != null) {   // follow the fingers smoothly rather than jumping with each event
+    const dt = Math.min(64, now - (hv.zLast || now)), z = hv.z || 0;
+    hv.z = z + (hv.zGoal - z) * (REDUCED ? 1 : 1 - Math.exp(-dt / 55));
+    if (Math.abs(hv.zGoal - hv.z) < 0.0005) { hv.z = hv.zGoal; hv.zGoal = null; }
+  }
+  hv.zLast = now;
   return hv.z || 0;
 }
-function hvZoomSet(z) { if (!hv || hv.mode === "exit") return; hv.zt = null; hv.z = clamp(z, 0, 1); }   // follows the fingers
+const hvZoomGoal = () => hv && hv.zGoal != null ? hv.zGoal : hvZoomNow(performance.now());
+function hvZoomSet(z) { if (!hv || hv.mode === "exit") return; hv.zt = null; hv.zGoal = clamp(z, 0, 1); }   // follows the fingers
 function hvZoomTo(target) {   // glides to one house (1) or three (0)
   if (!hv || hv.mode === "exit") return;
-  const now = performance.now(), from = hvZoomNow(now);
+  const now = performance.now(), from = hvZoomNow(now); hv.zGoal = null;
   if (REDUCED || Math.abs(target - from) < 0.002) { hv.z = target; hv.zt = null; return; }
   hv.zt = {from, to: target, t0: now, dur: 240 + 360 * Math.abs(target - from)};
 }
 // when a pinch ends, settle on one house or three, leaning the way the fingers moved
-function hvZoomSettle(z0) { const z = hvZoomNow(performance.now()), dz = z - z0; hvZoomTo(dz > 0.08 ? 1 : dz < -0.08 ? 0 : Math.round(z0)); }
+function hvZoomSettle(z0) { const z = hvZoomGoal(), dz = z - z0; hvZoomTo(dz > 0.08 ? 1 : dz < -0.08 ? 0 : Math.round(z0)); }
 function markHV() {
   const on = !!hv && hv.mode !== "exit";
   $("houses").setAttribute("aria-pressed", String(on)); $("houses-l").textContent = on ? "Sky view" : "House view";
@@ -1285,7 +1295,7 @@ function drawHouseFrame(ctx) {
     const p = pECL(L, -latH); if (!p) continue; const d = ((L % 30) + 30) % 30, edge = d === 0;
     ctx.globalAlpha = a * (d % 5 ? zl : 1); ctx.strokeStyle = "rgba(233,201,135,.6)";
     ctx.lineWidth = edge ? 1.4 : 1; ctx.beginPath(); ctx.moveTo(p[0], y1); ctx.lineTo(p[0], y1 - (edge ? 14 : d % 10 === 0 ? 8 : d % 5 === 0 ? 5 : 3)); ctx.stroke();
-    if (!edge && d % 10 === 0 && tall && zl < 1) { ctx.globalAlpha = a * (1 - zl); text(ctx, d + "°", p[0], y1 - 18, "rgba(233,201,135,.7)", `10px ${FM}`); }   // too cramped on phones: ticks only
+    if (!edge && d % 10 === 0 && tall && zl < 0.5) { ctx.globalAlpha = a * (1 - 2 * zl); text(ctx, d + "°", p[0], y1 - 18, "rgba(233,201,135,.7)", `10px ${FM}`); }   // too cramped on phones: ticks only
     if (!edge && d % 5 === 0 && rulerBelow) { ctx.globalAlpha = a * zl; text(ctx, d + "°", p[0], y1 + 11, "rgba(233,201,135,.8)", `10px ${FM}`); }
   }
   ctx.globalAlpha = a;
@@ -1836,14 +1846,24 @@ function endPtr(e) {
       vel = {az: clamp(az / span, -0.6, 0.6), alt: clamp(alt / span, -0.4, 0.4)};
     }
   } else if (moved <= 4) {
-    const now = performance.now();
-    if (now - lastTap < 320 && Math.hypot(p[0] - lastTapXY[0], p[1] - lastTapXY[1]) < 30) { zoomAt(p, 0.5); lastTap = 0; $("tip").hidden = true; }
-    else { lastTap = now; lastTapXY = p; showTip(p[0], p[1], true); }
+    const now = performance.now(), near = Math.hypot(p[0] - lastTapXY[0], p[1] - lastTapXY[1]) < 30;
+    tapCount = now - lastTap < 350 && near ? tapCount + 1 : 1; lastTap = now; lastTapXY = p; clearTimeout(tapTimer);
+    if (tapCount === 1) showTip(p[0], p[1], true);
+    else if (tapCount === 2) { $("tip").hidden = true; tapTimer = setTimeout(() => { if (tapCount === 2) zoomAt(p, 0.5); }, 300); }   // wait a moment in case a third tap follows
+    else { tapCount = 0; const sg = signAt(p); if (sg !== null) enterHV(sg); else zoomAt(p, 0.5); }
   }
   dragging = false; gesture = null; ov.classList.remove("dragging"); skyDirty = true; trailReset = true;
 }
 ov.addEventListener("pointerup", endPtr); ov.addEventListener("pointercancel", endPtr);
 ov.addEventListener("pointerleave", e => { if (e.pointerType === "mouse" && !ptrs.size) $("tip").hidden = true; });
+let tapCount = 0, tapTimer = 0;
+function signAt(p) {   // the sign (house) under a point on the zodiac band, or null if the point is off the band
+  let best = null;
+  for (let l = 0; l < 360; l += 0.5) { const q = pECL(l, 0); if (!q) continue; const d = Math.hypot(q[0] - p[0], q[1] - p[1]); if (!best || d < best.d) best = {d, l}; }
+  if (!best) return null;
+  const a = pECL(best.l, 0), b = pECL(best.l, 8); if (!a || !b) return null;
+  return best.d <= Math.max(24, Math.hypot(b[0] - a[0], b[1] - a[1])) ? Math.floor(norm360(best.l) / 30) : null;
+}
 function hvTap(p) {   // a tap shows what is under it; a double tap zooms in or out
   const now = performance.now();
   if (now - lastTap < 320 && Math.hypot(p[0] - lastTapXY[0], p[1] - lastTapXY[1]) < 30) { lastTap = 0; $("tip").hidden = true; hvZoomTo(hvZoomNow(now) > 0.5 ? 0 : 1); }
@@ -1857,7 +1877,7 @@ ov.addEventListener("wheel", e => {
     if (e.ctrlKey || Math.abs(e.deltaY) > Math.abs(e.deltaX)) {   // trackpad pinch or mouse wheel: zoom the centre house
       const now = performance.now();
       if (!hvWheelZ) hvWheelZ = {z0: hvZoomNow(now)}; else clearTimeout(hvWheelZ.timer);
-      hvZoomSet(hvZoomNow(now) - e.deltaY * m * (e.ctrlKey ? 0.012 : 0.004));
+      hvZoomSet(hvZoomGoal() - e.deltaY * m * (e.ctrlKey ? 0.012 : 0.004));
       hvWheelZ.timer = setTimeout(() => { const g = hvWheelZ; hvWheelZ = null; if (g) hvZoomSettle(g.z0); }, 170);
       return;
     }
