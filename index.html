@@ -2010,9 +2010,34 @@ function updateView(dt) {
 /* ---------------- gestures ---------------- */
 const ptrs = new Map(); let gesture = null, samples = [], lastTap = 0, lastTapXY = [0, 0], moved = 0, hvWheel = {acc: 0, last: 0, lock: false, t: 0, low: 0, prev: 0};
 function localXY(e) { const r = ov.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
+/* Dragging keeps the grabbed star under the finger: each move solves for the small turn of the view
+   (azimuth, altitude) that carries the grabbed point along with the finger. High overhead (where the zodiac
+   often runs in the tropics) and beyond the zenith that would need wild, reversing azimuth swings, so there
+   the drag acts as if you had grabbed the sky straight below the centre of view instead: same direction and
+   about the same speed as anywhere else. The solve is also damped, so it never spins. */
 function grabPan(p0, p1) {
-  const a0 = lookUnder(p0[0], p0[1]), a1 = lookUnder(p1[0], p1[1]);
-  const dAz = clamp(norm180(a0.az - a1.az), -25, 25), dAlt = a0.alt - a1.alt;
+  const g = lookUnder(p0[0], p0[1]), fov = view.fov;
+  let v = horFromAltAz(g.alt, g.az), off = [0, 0];
+  if (Math.abs(g.alt) > 55 || Math.abs(norm180(g.az - view.az)) > 90) {
+    v = horFromAltAz(clamp(view.alt, -55, 55), view.az);
+    const q0 = proj(cam, mul(cam.C, v)); if (!q0) return [0, 0];
+    off = [q0[0] - p0[0], q0[1] - p0[1]];
+  }
+  p1 = [p1[0] + off[0], p1[1] + off[1]];
+  const at = (az, alt) => { const c = camera(az, alt, fov, W, H); return proj(c, mul(c.C, v)); };
+  let az = view.az, alt = view.alt;
+  for (let it = 0; it < 2; it++) {
+    const q = at(az, alt); if (!q) break;
+    const ex = p1[0] - q[0], ey = p1[1] - q[1]; if (Math.hypot(ex, ey) < 0.05) break;
+    const h = 0.05, a1 = at(az + h, alt), a2 = at(az - h, alt), lo = Math.max(-89.9, alt - h), hi = Math.min(89.9, alt + h), b1 = at(az, hi), b2 = at(az, lo);
+    if (!a1 || !a2 || !b1 || !b2) break;
+    const ja = [(a1[0] - a2[0]) / (2 * h), (a1[1] - a2[1]) / (2 * h)], jb = [(b1[0] - b2[0]) / (hi - lo), (b1[1] - b2[1]) / (hi - lo)];
+    const lam = Math.pow(0.35 * Math.hypot(jb[0], jb[1]), 2);   // damping: azimuth that barely moves the point gets little say
+    const A = ja[0] * ja[0] + ja[1] * ja[1] + lam, B = ja[0] * jb[0] + ja[1] * jb[1], D = jb[0] * jb[0] + jb[1] * jb[1] + lam * 0.01;
+    const ra = ja[0] * ex + ja[1] * ey, rb = jb[0] * ex + jb[1] * ey, det = A * D - B * B; if (Math.abs(det) < 1e-12) break;
+    az += clamp((D * ra - B * rb) / det, -25, 25); alt = clamp(alt + (A * rb - B * ra) / det, -80, 89.5);
+  }
+  const dAz = clamp(norm180(az - view.az), -25, 25), dAlt = alt - view.alt;
   view.az = norm360(view.az + dAz); view.alt = clamp(view.alt + dAlt, -80, 89.5); buildCam();
   return [dAz, dAlt];
 }
