@@ -230,6 +230,22 @@ kbd{border:0;background:rgba(255,255,255,.12);box-shadow:0 2px 0 rgba(0,0,0,.4)}
 .hvinfo details{border-top:0;background:rgba(255,255,255,.035);border-radius:var(--rad-s);padding:6px 9px;margin-top:5px}
 .hvi-side{border-top:0;margin-top:10px;padding:7px 9px;background:rgba(255,255,255,.03);border-radius:var(--rad-s)}
 
+
+/* arrows: just the chevron */
+.hvarrow{width:52px;height:52px;padding:0;justify-content:center}
+.hvarrow small{display:none}
+/* time bar: minimise to just the clock */
+.btn.tbmin{order:20;display:grid;place-items:center;width:32px;height:30px;padding:0;margin-left:auto}
+.btn.tbmin svg{transition:transform .25s}
+.timebar.min{width:max-content;max-width:calc(100% - 24px);padding:6px 8px 6px 14px;flex-wrap:nowrap}
+.timebar.min .btn.tbmin svg{transform:rotate(180deg)}
+.timebar.min .trow>*:not(.clock):not(.tbmin),.timebar.min .tb-br{display:none!important}
+.timebar.min .btn.tbmin{margin-left:6px}
+/* the chart overview inside the insights card */
+.hvi-ovsum{margin:6px 0 2px 14px;line-height:1.5}
+.verdict-s{font-size:.66rem;font-weight:700;padding:1px 7px;border-radius:var(--rad-s);margin-left:auto}
+.verdict-s.good{color:var(--good);background:rgba(134,217,168,.16)} .verdict-s.bad{color:var(--warn);background:rgba(242,196,107,.16)} .verdict-s.mixed{color:var(--gold);background:rgba(233,201,135,.16)}
+
 @media (max-width:760px){
   .top{grid-template-columns:minmax(0,1fr) auto;row-gap:8px}
   .brand h1{font-size:1.15rem}
@@ -333,6 +349,7 @@ kbd{border:0;background:rgba(255,255,255,.12);box-shadow:0 2px 0 rgba(0,0,0,.4)}
   <div class="hud timebar glass" aria-label="Time travel">
     <div class="trow">
       <span class="clock" id="clock">—</span>
+      <button class="btn tbmin" type="button" id="tb-min" aria-expanded="true" aria-label="Hide the time controls" title="Hide time controls"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
       <button class="btn" type="button" id="now">Now</button>
       <button class="btn" type="button" id="birthjump" aria-label="Jump to birth moment"><span class="wide">Birth moment</span><span class="narrow">Birth</span></button>
       <span class="tb-br b1" aria-hidden="true"></span><span class="tb-br b2" aria-hidden="true"></span><span class="tb-br b3" aria-hidden="true"></span>
@@ -358,8 +375,8 @@ kbd{border:0;background:rgba(255,255,255,.12);box-shadow:0 2px 0 rgba(0,0,0,.4)}
     </div>
   </div>
 
-  <button class="hud hvarrow glass" id="hv-left" type="button" hidden><span aria-hidden="true">‹</span><small id="hv-left-l"></small></button>
-  <button class="hud hvarrow glass" id="hv-right" type="button" hidden><span aria-hidden="true">›</span><small id="hv-right-l"></small></button>
+  <button class="hud hvarrow glass" id="hv-left" type="button" hidden><span aria-hidden="true">‹</span></button>
+  <button class="hud hvarrow glass" id="hv-right" type="button" hidden><span aria-hidden="true">›</span></button>
   <div class="hud hvctrl" id="hv-ctrl" hidden>
     <button class="btn glass icon" id="hv-ins" type="button" aria-pressed="true" aria-label="House insights" title="House insights"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5"/><path d="M12 7.6h.01" stroke-width="2.6"/></svg></button>
   </div>
@@ -387,6 +404,7 @@ kbd{border:0;background:rgba(255,255,255,.12);box-shadow:0 2px 0 rgba(0,0,0,.4)}
           <dt><kbd>[</kbd><kbd>]</kbd></dt><dd>One day back or forward</dd>
           <dt><kbd>Shift</kbd>+<kbd>[</kbd><kbd>]</kbd></dt><dd>One year back or forward</dd>
           <dt><kbd>N</kbd></dt><dd>Back to now</dd>
+          <dt><kbd>T</kbd></dt><dd>Hide or show the time bar</dd>
           <dt><kbd>B</kbd></dt><dd>Birth moment</dd>
         </dl></section>
         <section><h3>Panels</h3><dl>
@@ -621,7 +639,7 @@ if (document.fonts && document.fonts.load) Promise.all(["16px OPTIOpus", "16px A
 const layers = {}; for (const [, items] of LAYER_GROUPS) for (const [k, , on] of items) layers[k] = on;
 layers.labels = true;
 Object.assign(layers, store.get("gocharsky.layers2", {}));
-let lang = store.get("gocharsky.lang", "sa");
+let lang = store.get("gocharsky.lang2", "en");
 let people = [DEFAULT_PERSON, ...(Array.isArray(store.get("gocharsky.people", [])) ? store.get("gocharsky.people", []) : [])];
 const curId = store.get("gocharsky.current", null);
 let person = people.find(p => p.id === curId) || (ASK_ON_FIRST_VISIT && people[1]) || people[0], natal = null;
@@ -1443,7 +1461,6 @@ function drawHouseFrame(ctx) {
     Xc.style.left = Math.max(6, x1 - Xc.offsetWidth) + "px"; Xc.style.top = ctrlTop + "px";
     if (!covered) placeInsights(x0, x1, ctrlTop, cs);
     const ls = ((cs + 1) % 12 + 12) % 12, rs = ((cs + 11) % 12);
-    $("hv-left-l").textContent = `${houseNo(ls)} · ${signName(ls)}`; $("hv-right-l").textContent = `${houseNo(rs)} · ${signName(rs)}`;
     Lb.setAttribute("aria-label", `Show house ${houseNo(ls)}, ${signFull(ls)}`); Rb.setAttribute("aria-label", `Show house ${houseNo(rs)}, ${signFull(rs)}`);
   }
   ctx.globalAlpha = 1;
@@ -1711,6 +1728,78 @@ function section(key, title, body, open) {
 }
 const rowsHTML = rows => `<dl class="rows">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl>`;
 
+// overall strength of one house right now (same rules as the full house reading)
+function houseScore(s, da) {
+  const h = houseNo(s), lagnaSign = signOf(natal.Asc.lon), av = ashtakavarga();
+  let score = PLANETS.filter(b => signOf(bodies[b].lon) === s).reduce((a, b) => a + planetReading(b, s, h, da).score, 0);
+  for (const b of PLANETS) if (aspectFrom(b, signOf(bodies[b].lon), s)) score += MALEFIC(b) ? -0.75 : 0.75;
+  const L = LORD[s], lh = ((signOf(bodies[L].lon) - lagnaSign + 12) % 12) + 1;
+  score += [1, 4, 5, 7, 9, 10].includes(lh) ? 0.5 : [6, 8, 12].includes(lh) ? -0.5 : 0; score += dignityOf(L, bodies[L].lon).score * 0.5;
+  const sav = av.sav[s]; score += sav >= 30 ? 1 : sav >= 28 ? 0.5 : sav < 25 ? -1 : -0.5;
+  return score;
+}
+function nextSignChange(b, tp, step, span) {   // when a slow planet next changes sign (bisected to within a few hours)
+  const s0 = signOf(sidPos(b, new Date(tp)).lon);
+  for (let d = step; d <= span; d += step) {
+    const t = tp + d * DAY; if (signOf(sidPos(b, new Date(t)).lon) === s0) continue;
+    let lo = t - step * DAY, hi = t; for (let k = 0; k < 14; k++) { const m = (lo + hi) / 2; if (signOf(sidPos(b, new Date(m)).lon) === s0) lo = m; else hi = m; }
+    return {b, t: hi, to: signOf(sidPos(b, new Date(hi + DAY)).lon)};
+  }
+  return null;
+}
+const ovCache = {key: "", html: ""};
+function overviewHTML(tp, da) {
+  const fast = Math.abs(rate) > 3600 || !!jump, key = [person.id, natal.birth, natal.Asc.lon.toFixed(3), Math.floor(tp / (6 * 3600000)), lang, fast].join(":"); if (ovCache.key === key) return ovCache.html;
+  const lagnaSign = signOf(natal.Asc.lon), fromL = lon => ((signOf(lon) - lagnaSign + 12) % 12) + 1, items = [];
+  let score = 0;
+  // the running period
+  if (da) {
+    const md = da.md, mdHouses = [], adHouses = [];
+    for (let s = 0; s < 12; s++) { if (LORD[s] === md) mdHouses.push(houseNo(s)); if (LORD[s] === da.ad && da.ad !== md) adHouses.push(houseNo(s)); }
+    const themes = hs => hs.map(h => `${ord(h)} (${HOUSES[h - 1][1].split(", ").slice(0, 2).join(", ")})`).join(" and ");
+    const nh = fromL(natal[md].lon), ndg = dignityOf(md, natal[md].lon);
+    let per = `You are in <b>${md}</b> Mahadasha until ${fmtDay(da.mdEnd)}, with <b>${da.ad}</b> Antardasha until ${fmtDay(da.adEnd)}. `;
+    per += mdHouses.length ? `${md} rules your ${themes(mdHouses)}, ` : "";
+    per += `and at birth it sat in your ${ord(nh)} house, ${ndg.label}, so this period brings those matters forward.`;
+    if (adHouses.length) per += ` The ${da.ad} sub-period adds your ${themes(adHouses)}.`;
+    items.push(["The period", per]);
+    // how the period lords are doing in the sky now
+    const lords = [md, da.ad].filter((x, i, a) => a.indexOf(x) === i).map(x => {
+      const o = bodies[x], n = fromMoon(o.lon), good = GOOD_FROM_MOON[x].includes(n), dg = dignityOf(x, o.lon);
+      score += (good ? 1 : -0.75) + dg.score * 0.5;
+      return `${dot(x)}<b>${x}</b> is passing your ${ord(fromL(o.lon))} house (${signName(signOf(o.lon))}), ${dg.label}${o.retro ? ", retrograde" : ""}; counted from your Moon it is in a <span class="${good ? "good" : "bad"}">${good ? "supportive" : "testing"}</span> place (${ord(n)}).`;
+    });
+    items.push(["Period lords now", lords.join(" ")]);
+  }
+  // the slow planets set the background
+  const slow = [];
+  for (const b of ["Saturn", "Jupiter", "Rahu", "Ketu"]) {
+    const o = bodies[b], n = fromMoon(o.lon), good = GOOD_FROM_MOON[b].includes(n);
+    let w = good ? 1 : -0.5; if (b === "Saturn" && [12, 1, 2, 8, 4].includes(n)) w = -1.5; if (b === "Jupiter") w *= 1.2; if (b === "Ketu") w *= 0.5;
+    score += w;
+    slow.push(`${dot(b)}<b>${b}</b> in your ${ord(fromL(o.lon))} house, ${ord(n)} from the Moon: <span class="${good ? "good" : "bad"}">${GOCHARA[b][n - 1]}</span>.`);
+  }
+  items.push(["The big transits", slow.join(" ")]);
+  // which houses are lit up and which are under pressure
+  const hs = []; for (let s = 0; s < 12; s++) hs.push({s, h: houseNo(s), sc: houseScore(s, da)});
+  hs.sort((a, b) => b.sc - a.sc);
+  const nm = x => `${ord(x.h)} (${HOUSES[x.h - 1][1].split(", ").slice(0, 2).join(", ")})`;
+  items.push(["Strongest now", `<span class="good">${hs.slice(0, 2).map(nm).join(", ")}</span>`]);
+  items.push(["Under most pressure", `<span class="bad">${hs.slice(-2).reverse().map(nm).join(", ")}</span>`]);
+  // what changes next
+  if (!fast) {
+    const nx = [nextSignChange("Jupiter", tp, 5, 420), nextSignChange("Saturn", tp, 10, 1000), nextSignChange("Rahu", tp, 10, 600)].filter(Boolean);
+    if (da) nx.push({b: "dasha", t: da.adEnd});
+    nx.sort((a, b) => a.t - b.t);
+    items.push(["Coming up", nx.slice(0, 3).map(x => x.b === "dasha" ? `a new Antardasha around ${fmtDay(x.t)}` : `${x.b} moves into your ${ord(houseNo(x.to))} house (${signName(x.to)}) around ${fmtDay(x.t)}`).join("; ") + "."]);
+  }
+  const V = score >= 1.5 ? ["Well supported", "good"] : score >= 0.4 ? ["Leaning good", "good"] : score > -0.6 ? ["Mixed", "mixed"] : score > -1.8 ? ["Some pressure", "bad"] : ["Under pressure", "bad"];
+  const sum = {"Well supported": "Overall this is a supportive phase: a good time to start things and push forward.", "Leaning good": "Overall the phase leans your way; steady effort is rewarded.",
+    "Mixed": "Overall the phase is mixed: some areas open up while others need patience.", "Some pressure": "Overall the phase asks for patience: keep routines steady and avoid big risks.",
+    "Under pressure": "Overall this is a testing phase: slow down, look after health and money, and build quietly."}[V[0]];
+  const html = {V, body: `<p class="hvi-ovsum">${sum}</p>${rowsHTML(items)}`};
+  ovCache.key = key; ovCache.html = html; return html;
+}
 function insightsHTML(s, tp) {
   const h = houseNo(s), [bhava, sig] = HOUSES[h - 1], lagnaSign = signOf(natal.Asc.lon), ms = signOf(natal.Moon.lon), av = ashtakavarga();
   const short = sig.split(", ").slice(0, 3).join(", ");
@@ -1784,6 +1873,7 @@ function insightsHTML(s, tp) {
   return `<div class="hvi-head"><b>House ${h}</b><span>${signFull(s)}</span><span class="tag">${bhava}</span><span class="verdict ${V[1]}">${V[0]}</span><button class="hvi-x" type="button" data-act="expand" aria-label="${insBig ? "Make the reading smaller" : "Expand the reading"}" title="${insBig ? "Smaller" : "Expand"}"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${xIcon}</svg></button></div>
   <p class="hvi-sig">Signifies ${sig}.</p>
   <p class="hvi-now">${pic.join(" ")}</p>
+  ${(() => { const ov = overviewHTML(tp, da); return section("overview", `<b>This chart right now</b> <span class="m">· ${esc(person.name)}${da ? ` · ${da.md}–${da.ad}` : ""}</span> <span class="verdict-s ${ov.V[1]}">${ov.V[0]}</span>`, ov.body, true); })()}
   <div class="hvi-cols"><div><h3>Planets here now</h3>${nowSecs}</div>
   <div><h3>What shapes this house</h3>${section("infl", "Combinations, aspects and support", `<ul>${infl.join("")}</ul>`, !now.length)}${section("birth", `Birth chart and dasha${da ? ` <span class="m">· ${da.md}–${da.ad}</span>` : ""}`, `<ul>${bl.filter(Boolean).map(x => `<li>${x}</li>`).join("")}</ul>`, false)}</div></div>
   <div class="hvi-side">${sideLine((s + 1) % 12, "l")}${sideLine((s + 11) % 12, "r")}</div>
@@ -2024,6 +2114,7 @@ window.addEventListener("keydown", e => {
   if (code === "KeyF") { setPanel($("panel").hidden); if (!$("panel").hidden) $("tab-f").click(); e.preventDefault(); return; }
   if (code === "KeyC") { $("mychart").click(); e.preventDefault(); return; }
   if (code === "KeyN") { $("now").click(); e.preventDefault(); return; }
+  if (code === "KeyT") { $("tb-min").click(); e.preventDefault(); return; }
   if (code === "KeyB") { $("birthjump").click(); e.preventDefault(); return; }
   if (code === "BracketLeft" || code === "BracketRight") {
     const dir = code === "BracketRight" ? 1 : -1;
@@ -2133,6 +2224,9 @@ $("go").addEventListener("click", () => {
   const [y, m, dd] = d.split("-").map(Number), [hh, mi] = ($("jt").value || "00:00").split(":").map(Number);
   inputsEdited = false; travelTo(localToUTC(y, m, dd, hh, mi, loc.tz), false);
 });
+function setTbMin(on) { const tb = document.querySelector(".timebar"); tb.classList.toggle("min", on); $("tb-min").setAttribute("aria-expanded", String(!on)); $("tb-min").setAttribute("aria-label", on ? "Show the time controls" : "Hide the time controls"); $("tb-min").title = on ? "Show time controls" : "Hide time controls"; store.set("gocharsky.tbmin", on); }
+$("tb-min").addEventListener("click", () => setTbMin(!document.querySelector(".timebar").classList.contains("min")));
+setTbMin(store.get("gocharsky.tbmin", false));
 $("now").addEventListener("click", () => { inputsEdited = false; travelTo(Date.now(), true); });
 $("birthjump").addEventListener("click", () => { inputsEdited = false; travelTo(natal.birth, false); });
 function updateClock(ms) {
@@ -2148,7 +2242,7 @@ function saveLayers() { store.set("gocharsky.layers2", layers); }
 $("pane-f").addEventListener("change", e => { const k = e.target.dataset.layer || (e.target.id === "ly-labels" ? "labels" : null); if (!k) return; layers[k] = e.target.checked; skyDirty = true; trailReset = true; saveLayers(); });
 $("pane-f").addEventListener("change", e => { if (e.target.id === "ly-insights") setInsights(e.target.checked); });
 function markLang() { $("lang").querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.lang === lang))); }
-$("lang").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; lang = b.dataset.lang; store.set("gocharsky.lang", lang); markLang(); });
+$("lang").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; lang = b.dataset.lang; store.set("gocharsky.lang2", lang); markLang(); });
 markLang();
 function setPanel(open) { $("panel").hidden = !open; $("toggle").setAttribute("aria-expanded", String(open)); }
 $("toggle").addEventListener("click", () => setPanel($("panel").hidden));
