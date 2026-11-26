@@ -190,6 +190,46 @@ form.add{display:grid;gap:8px;margin-top:8px}
 .toast{top:64px;left:50%;transform:translateX(-50%);padding:6px 14px;border-radius:var(--rad);font-size:.8rem;font-family:var(--f-data);color:var(--ink);pointer-events:none;transition:opacity .4s;white-space:nowrap}
 .loadmsg{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);font-size:.95rem;z-index:6;text-align:center;padding:0 24px}
 
+
+/* ---- no outlines: surfaces are told apart by fill, depth and blur, not by light borders ---- */
+:root{--fill:rgba(255,255,255,.075);--fill-hi:rgba(255,255,255,.13);--fill-press:rgba(255,255,255,.2)}
+.glass{border:0;background:linear-gradient(160deg,rgba(255,255,255,.11),rgba(255,255,255,.035) 42%,rgba(130,118,255,.07)),rgba(14,13,44,.5);
+  backdrop-filter:blur(22px) saturate(165%);-webkit-backdrop-filter:blur(22px) saturate(165%);box-shadow:0 12px 34px rgba(0,0,0,.36),0 2px 8px rgba(0,0,0,.18)}
+/* the time bar: liquid glass, clearer and more frosted than the rest */
+.timebar.glass{background:linear-gradient(165deg,rgba(255,255,255,.14),rgba(255,255,255,.04) 38%,rgba(255,255,255,.02) 70%,rgba(150,135,255,.09)),rgba(16,14,48,.32);
+  backdrop-filter:blur(28px) saturate(190%) brightness(1.06);-webkit-backdrop-filter:blur(28px) saturate(190%) brightness(1.06);box-shadow:0 18px 44px rgba(0,0,0,.42),0 3px 10px rgba(0,0,0,.2)}
+.btn,.btn:hover{border:0}
+.btn{background:var(--fill);transition:background .15s,transform .1s}
+.btn:hover{background:var(--fill-hi)} .btn:active{background:var(--fill-press);transform:scale(.97)}
+.btn.primary{background:var(--aurora);box-shadow:0 4px 14px rgba(140,123,255,.35)} .btn.primary:hover{background:#9d8fff}
+.btn.play.paused{background:var(--gold);box-shadow:0 4px 14px rgba(233,201,135,.3)}
+.seg{border:0;background:rgba(255,255,255,.045);padding:2px;gap:2px;border-radius:var(--rad)}
+.seg button,.seg button+button{border:0;border-radius:var(--rad-s)}
+.seg button:hover{background:var(--fill)} .seg button:active{background:var(--fill-hi)}
+.seg.steps button{background:var(--fill)} .seg.steps button:hover{background:var(--fill-hi)} .seg.steps button:active{background:var(--fill-press)}
+select,input[type=text],input[type=date],input[type=time]{border:0;background:rgba(0,0,10,.28);box-shadow:inset 0 1px 3px rgba(0,0,0,.35)}
+select:focus,input:focus{background:rgba(0,0,10,.4)}
+.chip,.chip[aria-pressed="true"]{border:0}
+.chip[aria-pressed="true"]{background:rgba(233,201,135,.2);color:#FFE7B8}
+.iconbtn:hover{background:linear-gradient(160deg,rgba(255,255,255,.16),rgba(255,255,255,.06)),rgba(14,13,44,.5)}
+.iconbtn[aria-pressed="true"]{background:linear-gradient(160deg,rgba(233,201,135,.34),rgba(233,201,135,.14)),rgba(14,13,44,.5);color:#FFE7B8}
+.hvarrow:hover{background:linear-gradient(160deg,rgba(255,255,255,.17),rgba(255,255,255,.06)),rgba(14,13,44,.5)}
+.hvctrl .btn.icon{border-radius:50%;width:40px;height:40px}
+.hvctrl .btn[aria-pressed="true"]{background:linear-gradient(160deg,rgba(255,255,255,.3),rgba(255,255,255,.14)),rgba(14,13,44,.5);color:#fff}
+.hvctrl .btn[aria-pressed="false"]{color:var(--muted)}
+kbd{border:0;background:rgba(255,255,255,.12);box-shadow:0 2px 0 rgba(0,0,0,.4)}
+.results{border:0} .tip{border:0}
+.master{border:0;background:rgba(140,123,255,.14)}
+.tab{border-bottom:0;border-radius:var(--rad-s)} .tab[aria-selected="true"]{background:var(--fill-hi);color:var(--ink)}
+.pill{border:0;background:rgba(255,255,255,.07)}
+.pill.warn{background:rgba(242,196,107,.15)} .pill.good{background:rgba(134,217,168,.15)} .pill.hit{background:rgba(255,126,184,.16)} .pill.day{background:rgba(140,190,255,.15)}
+.hvi-x{border:0;background:var(--fill)} .hvi-x:hover{background:var(--fill-hi)}
+.hvi-head .tag{border:0;background:rgba(233,201,135,.15);padding:1px 8px}
+.hvi-head .verdict{border:0;padding:2px 9px}
+.hvi-head .verdict.good{background:rgba(134,217,168,.16)} .hvi-head .verdict.bad{background:rgba(242,196,107,.16)} .hvi-head .verdict.mixed{background:rgba(233,201,135,.16)}
+.hvinfo details{border-top:0;background:rgba(255,255,255,.035);border-radius:var(--rad-s);padding:6px 9px;margin-top:5px}
+.hvi-side{border-top:0;margin-top:10px;padding:7px 9px;background:rgba(255,255,255,.03);border-radius:var(--rad-s)}
+
 @media (max-width:760px){
   .top{grid-template-columns:minmax(0,1fr) auto;row-gap:8px}
   .brand h1{font-size:1.15rem}
@@ -322,7 +362,6 @@ form.add{display:grid;gap:8px;margin-top:8px}
   <button class="hud hvarrow glass" id="hv-right" type="button" hidden><span aria-hidden="true">›</span><small id="hv-right-l"></small></button>
   <div class="hud hvctrl" id="hv-ctrl" hidden>
     <button class="btn glass icon" id="hv-ins" type="button" aria-pressed="true" aria-label="House insights" title="House insights"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5"/><path d="M12 7.6h.01" stroke-width="2.6"/></svg></button>
-    <button class="btn glass icon" id="hv-exit" type="button" aria-label="Back to sky" title="Back to sky"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.5 3.5a6.5 6.5 0 0 0 8 8 8.6 8.6 0 1 1-8-8Z"/><path d="M19 2.8v3.6"/><path d="M20.8 4.6h-3.6"/></svg></button>
   </div>
   <section class="hud hvinfo" id="hv-info" hidden aria-live="polite" aria-label="House insights"></section>
 
@@ -1412,7 +1451,6 @@ function drawHouseFrame(ctx) {
 $("houses").addEventListener("click", () => { if (hv && hv.mode !== "exit") exitHV(); else enterHV(); });
 $("hv-left").addEventListener("click", () => hvStep(1));
 $("hv-right").addEventListener("click", () => hvStep(-1));
-$("hv-exit").addEventListener("click", exitHV);
 
 /* ---------------- house insights (shown above the frame) ---------------- */
 const LORD = ["Mars","Venus","Mercury","Moon","Sun","Mercury","Venus","Mars","Jupiter","Saturn","Saturn","Jupiter"];
