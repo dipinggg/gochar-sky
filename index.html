@@ -943,11 +943,12 @@ function drawBody(ctx, b, x, y, r, o) {
     const [per, ph] = BREATH[b], q = o.t === undefined ? 0.5 : 0.5 + 0.5 * Math.sin(o.t * 6.2832 / per + ph), pe = q * q * (3 - 2 * q);
     let shimmer = 1;
     if (o.t !== undefined && !hv && o.alt > -1 && o.alt < 10) shimmer = 1 + 0.12 * (1 - Math.max(0, o.alt) / 10) * (0.6 * Math.sin(o.t / 83 + ph * 7) + 0.4 * Math.sin(o.t / 47 + ph * 3));
-    const g = (b === "Sun" ? r * 4.8 : r * (2 + 3.2 * s)) * (0.82 + 0.4 * pe);
+    // glow size follows the planet's size: small planets (Moon, Mercury, Mars) get a tighter halo, big ones a wider one
+    const sizeF = clamp((P[b].r - 4) / 8, 0, 1), g = (b === "Sun" ? r * 4.8 : r * (1.7 + (0.9 + 1.9 * sizeF) * s)) * (0.88 + 0.24 * pe);
     ctx.globalCompositeOperation = "lighter";
     ctx.globalAlpha = a * GLOW_LEVEL * Math.min(1, (b === "Sun" ? 0.7 : 0.22 + 0.62 * s) * (0.45 + 0.8 * pe) * shimmer);
     ctx.drawImage(GLOW[b], x - g, y - g, g * 2, g * 2);
-    const c = r * (1.9 + 0.5 * pe);   // a tight bright halo close to the disc that swells with the pulse
+    const c = r * (1.5 + 0.35 * pe);   // a tight bright halo close to the disc that swells with the pulse
     ctx.globalAlpha = a * GLOW_LEVEL * Math.min(1, (0.15 + 0.45 * pe) * s);
     ctx.drawImage(GLOW[b], x - c, y - c, c * 2, c * 2);
     ctx.globalCompositeOperation = "source-over";
@@ -1864,10 +1865,12 @@ function signAt(p) {   // the sign (house) under a point on the zodiac band, or 
   const a = pECL(best.l, 0), b = pECL(best.l, 8); if (!a || !b) return null;
   return best.d <= Math.max(24, Math.hypot(b[0] - a[0], b[1] - a[1])) ? Math.floor(norm360(best.l) / 30) : null;
 }
-function hvTap(p) {   // a tap shows what is under it; a double tap zooms in or out
-  const now = performance.now();
-  if (now - lastTap < 320 && Math.hypot(p[0] - lastTapXY[0], p[1] - lastTapXY[1]) < 30) { lastTap = 0; $("tip").hidden = true; hvZoomTo(hvZoomNow(now) > 0.5 ? 0 : 1); }
-  else { lastTap = now; lastTapXY = p; showTip(p[0], p[1], true); }
+function hvTap(p) {   // a tap shows what is under it; a double tap zooms the house; a triple tap goes back to the sky
+  const now = performance.now(), near = Math.hypot(p[0] - lastTapXY[0], p[1] - lastTapXY[1]) < 30;
+  tapCount = now - lastTap < 350 && near ? tapCount + 1 : 1; lastTap = now; lastTapXY = p; clearTimeout(tapTimer);
+  if (tapCount === 1) showTip(p[0], p[1], true);
+  else if (tapCount === 2) { $("tip").hidden = true; tapTimer = setTimeout(() => { if (tapCount === 2 && hv) hvZoomTo(hvZoomNow(performance.now()) > 0.5 ? 0 : 1); }, 300); }
+  else { tapCount = 0; exitHV(); }
 }
 let hvWheelZ = null, gz = null;
 function zoomAt(p, factor) { if (hv) return; fly = null; zoomAnchor = p; zoomTarget = clamp(zoomTarget * factor, 12, 175); }
