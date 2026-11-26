@@ -1284,9 +1284,14 @@ const HV_HALF = 45, HV_LAT = 12;
 /* One-house zoom: pinch in and the centre house grows 2.25x. That much keeps the Moon's widest
    latitude (about 5.3°) inside the frame, so nothing is pushed off it. 0 = three houses, 1 = one house. */
 const HV_K = 2.25;
+/* Phones get one more step (2 = close-up): a further 1.75x, so the centre house spans the whole screen width.
+   The frame stops shrinking in degrees after step 1 and grows taller instead, so the Moon still fits. */
+const HV_K2 = 1.75;
+const hvZmax = () => W < 760 ? 2 : 1;
+const hvZF = z => z <= 1 ? Math.pow(HV_K, z) : HV_K * Math.pow(HV_K2, z - 1);
 let hvZ = 0;   // the zoom being drawn this frame
 const hvZl = () => clamp((hvZ - 0.35) / 0.55, 0, 1);   // how far the zoomed-in details have faded in
-const hvLatH = () => 2 * Math.atan(Math.tan(HV_LAT / 2 * DEG) / Math.pow(HV_K, hvZ)) / DEG;   // frame half-height in degrees
+const hvLatH = () => 2 * Math.atan(Math.tan(HV_LAT / 2 * DEG) / hvZF(Math.min(1, hvZ))) / DEG;   // frame half-height in degrees
 /* While the Filters panel is open on a wide screen, House view shrinks into the space to its left
    (frame, arrows and insights all move together); on phones the panel is a bottom sheet instead. */
 let hvAreaW = 0, hvAreaT = 0;
@@ -1299,7 +1304,7 @@ function hvArea(now) {
 }
 const hvPanelCovers = () => W < 760 && !$("panel").hidden;   // phone: the bottom sheet covers House view
 function hvS() { const w = hvAreaW || W; return Math.max(60, w / 2 - (w < 600 ? 52 : 70)) / (2 * Math.tan(26 * DEG)); }
-function hvBasis(lamSid) { return {f: mul(F.EQJ_HOR, eclToEQJ(F, lamSid, 0)), u: mul(F.EQJ_HOR, mul(F.ECT_EQJ, [0, 0, 1])), S: hvS() * Math.pow(HV_K, hvZ)}; }
+function hvBasis(lamSid) { return {f: mul(F.EQJ_HOR, eclToEQJ(F, lamSid, 0)), u: mul(F.EQJ_HOR, mul(F.ECT_EQJ, [0, 0, 1])), S: hvS() * hvZF(hvZ)}; }
 function hvLam(now) {
   if (!hv.nav) return hv.lam;
   const k = clamp((now - hv.nav.t0) / hv.nav.dur, 0, 1);
@@ -1309,6 +1314,7 @@ function hvLam(now) {
 let hvPrevCam = "";
 function houseCam(now) {
   hvZ = hvZoomNow(now); const aw = hvArea(now);
+  if (!hv.zt && hv.zGoal == null && hv.z > hvZmax() + 0.001) hvZoomTo(hvZmax());   // e.g. a phone turned to a wide screen
   const csig = hvZ.toFixed(4) + "|" + aw.toFixed(1);   // zooming or making room for the panel moves the stars too
   if (csig !== hvPrevCam) { hvPrevCam = csig; skyDirty = true; trailReset = true; }
   const tgt = hvBasis(hvLam(now));
@@ -1368,15 +1374,22 @@ function hvZoomNow(now) {
   return hv.z || 0;
 }
 const hvZoomGoal = () => hv && hv.zGoal != null ? hv.zGoal : hvZoomNow(performance.now());
-function hvZoomSet(z) { if (!hv || hv.mode === "exit") return; hv.zt = null; hv.zGoal = clamp(z, 0, 1); }   // follows the fingers
-function hvZoomTo(target) {   // glides to one house (1) or three (0)
+function hvZoomSet(z) { if (!hv || hv.mode === "exit") return; hv.zt = null; hv.zGoal = clamp(z, 0, hvZmax()); }   // follows the fingers
+let closeTipShown = false;
+function hvZoomTo(target) {   // glides to three houses (0), one house (1) or, on phones, a close-up (2)
+  if (target === 1 && hvZmax() === 2 && !closeTipShown && hv && Math.round(hv.z || 0) === 0) { closeTipShown = true; toast("Spread two fingers again for a close-up", 2200); }
   if (!hv || hv.mode === "exit") return;
   const now = performance.now(), from = hvZoomNow(now); hv.zGoal = null;
   if (REDUCED || Math.abs(target - from) < 0.002) { hv.z = target; hv.zt = null; return; }
   hv.zt = {from, to: target, t0: now, dur: 240 + 360 * Math.abs(target - from)};
 }
 // when a pinch ends, settle on one house or three, leaning the way the fingers moved
-function hvZoomSettle(z0) { const z = hvZoomGoal(), dz = z - z0; hvZoomTo(dz > 0.08 ? 1 : dz < -0.08 ? 0 : Math.round(z0)); }
+function hvZoomSettle(z0) {
+  const z = hvZoomGoal(), dz = z - z0, r0 = Math.round(z0), mx = hvZmax();
+  hvZoomTo(dz > 0.08 ? Math.min(mx, Math.max(r0 + 1, Math.round(z))) : dz < -0.08 ? Math.max(0, Math.min(r0 - 1, Math.round(z))) : Math.min(mx, r0));
+}
+// one step in or out (keys, double tap)
+const hvZoomStep = d => hvZoomTo(clamp(Math.round(hvZoomGoal()) + d, 0, hvZmax()));
 function markHV() {
   const on = !!hv && hv.mode !== "exit";
   $("houses").setAttribute("aria-pressed", String(on)); $("houses-l").textContent = on ? "Sky view" : "House view";
@@ -1391,7 +1404,7 @@ function drawHouseFrame(ctx) {
   const now = performance.now(), lam = hvLam(now), cs = Math.floor(norm360(hv.nav ? hv.nav.to : hv.lam) / 30);
   // the camera is always centred on the frame, so the frame never moves on screen
   // the frame keeps the same size on screen at every zoom; zooming in just shows fewer degrees inside it
-  const zf = Math.pow(HV_K, hvZ), half = 2 * Math.atan(Math.tan(HV_HALF / 2 * DEG) / zf) / DEG, latH = hvLatH();
+  const zf = hvZF(hvZ), half = 2 * Math.atan(Math.tan(HV_HALF / 2 * DEG) / zf) / DEG, latH = hvLatH();
   const pl = pECL(lam + half, 0), pr = pECL(lam - half, 0), pt = pECL(lam, latH), pb = pECL(lam, -latH);
   if (!pl || !pr || !pt || !pb) return;
   const x0 = Math.min(pl[0], pr[0]), x1 = Math.max(pl[0], pr[0]), y0 = Math.min(pt[1], pb[1]), y1 = Math.max(pt[1], pb[1]), a = hvAmt;
@@ -2050,7 +2063,7 @@ function hvTap(p) {   // a tap shows what is under it; a double tap zooms the ho
   const now = performance.now(), near = Math.hypot(p[0] - lastTapXY[0], p[1] - lastTapXY[1]) < 30;
   tapCount = now - lastTap < 350 && near ? tapCount + 1 : 1; lastTap = now; lastTapXY = p; clearTimeout(tapTimer);
   if (tapCount === 1) showTip(p[0], p[1], true);
-  else if (tapCount === 2) { $("tip").hidden = true; tapTimer = setTimeout(() => { if (tapCount === 2 && hv) hvZoomTo(hvZoomNow(performance.now()) > 0.5 ? 0 : 1); }, 300); }
+  else if (tapCount === 2) { $("tip").hidden = true; tapTimer = setTimeout(() => { if (tapCount === 2 && hv) { const z = Math.round(hvZoomNow(performance.now())); hvZoomTo(z >= hvZmax() ? 0 : z + 1); } }, 300); }
   else { tapCount = 0; exitHV(); }
 }
 let hvWheelZ = null, gz = null;
@@ -2105,7 +2118,7 @@ window.addEventListener("keydown", e => {
   if (e.key === " ") { if (e.target.closest("button,a,summary")) return; e.preventDefault(); togglePlay(); return; }
   const code = e.code, onBtn = e.target.closest("button,a,summary");
   if (e.key === "Escape") {
-    if (hv) { if (hvZoomNow(performance.now()) > 0.5) hvZoomTo(0); else exitHV(); }
+    if (hv) { if (hvZoomNow(performance.now()) > 0.5) hvZoomStep(-1); else exitHV(); }
     else if (!$("panel").hidden) setPanel(false); else if (focus) setFocus(null); else return;
     e.preventDefault(); return;
   }
@@ -2126,8 +2139,8 @@ window.addEventListener("keydown", e => {
     const now = performance.now(), canStep = !e.repeat || now - hvKeyT > 420;
     if (code === "KeyA" || code === "ArrowLeft") { if (canStep) { hvStep(1); hvKeyT = now; } }
     else if (code === "KeyD" || code === "ArrowRight") { if (canStep) { hvStep(-1); hvKeyT = now; } }
-    else if (code === "KeyW" || code === "ArrowUp" || code === "KeyE" || e.key === "+" || e.key === "=") hvZoomTo(1);
-    else if (code === "KeyS" || code === "ArrowDown" || code === "KeyQ" || e.key === "-" || e.key === "_") hvZoomTo(0);
+    else if (code === "KeyW" || code === "ArrowUp" || code === "KeyE" || e.key === "+" || e.key === "=") hvZoomStep(1);
+    else if (code === "KeyS" || code === "ArrowDown" || code === "KeyQ" || e.key === "-" || e.key === "_") hvZoomStep(-1);
     else return;
     e.preventDefault(); return;
   }
@@ -2349,7 +2362,7 @@ function updateReadings(contacts) {
   if (contacts.length) out.push(["hit", `${contacts.length} close contact${contacts.length > 1 ? "s" : ""}`]);
   $("readings").innerHTML = out.map(([c, h]) => `<span class="pill ${c}">${h}</span>`).join("");
   $("contacts").innerHTML = contacts.length ? contacts.slice().sort((a, b) => a.o - b.o).map(c => `<li class="contact"><span class="orb">${c.o.toFixed(1)}°</span><span>${c.b}${bodies[c.b].retro ? " (retrograde)" : ""} on birth <b>${c.n === "Asc" ? "Lagna" : c.n}</b></span></li>`).join("") : `<li class="empty">No planet is within 3° of a birth planet. The Moon is left out because it moves about 13° a day.</li>`;
-  const mode = hv ? (hvZ > 0.5 ? "one house" : "house view") : jump ? "travelling…" : live ? "live" : rate === 0 ? "paused" : rate === 1 ? "playing" : (RATES.find(r => r[0] === rate) || [, ""])[1];
+  const mode = hv ? (hvZ > 1.5 ? "close-up" : hvZ > 0.5 ? "one house" : "house view") : jump ? "travelling…" : live ? "live" : rate === 0 ? "paused" : rate === 1 ? "playing" : (RATES.find(r => r[0] === rate) || [, ""])[1];
   $("status").innerHTML = `<b>${esc(shortPlace(loc.name))}</b> · ${mode}`;
 }
 
