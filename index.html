@@ -217,6 +217,8 @@ select:focus,input:focus{background:rgba(0,0,10,.4)}
 .iconbtn[aria-pressed="true"]{background:linear-gradient(160deg,rgba(233,201,135,.34),rgba(233,201,135,.14)),rgba(14,13,44,.5);color:#FFE7B8}
 .hvarrow:hover{background:linear-gradient(160deg,rgba(255,255,255,.17),rgba(255,255,255,.06)),rgba(14,13,44,.5)}
 .hvctrl .btn.icon{border-radius:50%;width:40px;height:40px}
+.toast{z-index:6}
+.hvctrl .btn.insbtn{display:inline-flex;align-items:center;gap:7px;height:38px;padding:0 15px 0 12px;border-radius:999px;font-weight:600;font-size:.84rem}
 .hvctrl .btn[aria-pressed="true"]{background:linear-gradient(160deg,rgba(255,255,255,.3),rgba(255,255,255,.14)),rgba(14,13,44,.5);color:#fff}
 .hvctrl .btn[aria-pressed="false"]{color:var(--muted)}
 kbd{border:0;background:rgba(255,255,255,.12);box-shadow:0 2px 0 rgba(0,0,0,.4)}
@@ -283,6 +285,8 @@ kbd{border:0;background:rgba(255,255,255,.12);box-shadow:0 2px 0 rgba(0,0,0,.4)}
   .iconbtn{padding:7px 9px}
   .iconbtn #houses-l{display:none}
   #toggle{padding-left:9px;padding-right:9px}
+  .hvctrl .btn.insbtn{height:30px;padding:0 12px 0 9px;font-size:.8rem;gap:6px}
+  .hvctrl .btn.insbtn svg{width:16px;height:16px}
   .hvarrow{width:50px;padding:8px 2px}
   .hvarrow span{font-size:1.7rem}
   .hvarrow small{font-size:.6rem}
@@ -392,7 +396,7 @@ kbd{border:0;background:rgba(255,255,255,.12);box-shadow:0 2px 0 rgba(0,0,0,.4)}
   <button class="hud hvarrow glass" id="hv-left" type="button" hidden><span aria-hidden="true">‹</span></button>
   <button class="hud hvarrow glass" id="hv-right" type="button" hidden><span aria-hidden="true">›</span></button>
   <div class="hud hvctrl" id="hv-ctrl" hidden>
-    <button class="btn glass icon" id="hv-ins" type="button" aria-pressed="true" aria-label="House insights" title="House insights"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5"/><path d="M12 7.6h.01" stroke-width="2.6"/></svg></button>
+    <button class="btn glass insbtn" id="hv-ins" type="button" aria-pressed="true" title="House insights"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5"/><path d="M12 7.6h.01" stroke-width="2.6"/></svg><span>Insights</span></button>
   </div>
   <section class="hud hvinfo" id="hv-info" hidden aria-live="polite" aria-label="House insights"></section>
 
@@ -606,7 +610,7 @@ const DEFAULT_SKY = null;
 const ASK_ON_FIRST_VISIT = true;
 const RATES = [[-604800,"−1 wk/s"],[-86400,"−1 day/s"],[1,"Live"],[86400,"+1 day/s"],[604800,"+1 wk/s"]];
 const LAYER_GROUPS = [
-  ["Planets", [["now","Planets now",true],["birth","Birth chart (faint)",true],["contacts","Close contacts",true]]],
+  ["Planets", [["now","Planets now",true],["birth","Birth chart (faint)",false],["contacts","Close contacts",true]]],
   ["Zodiac",  [["band","Sign bands",true],["signs","Sign names",true],["houses","House numbers",true],["nak","Nakshatras",false]]],
   ["Sky",     [["aurora","Aurora",true],["mw","Milky Way",true],["const","Constellation lines",true],["starnames","Bright star names",false],["moonpath","Moon phases ahead",true],["trails","Trails when time moves fast",true],["day","Real daylight",false]]],
   ["Ground",  [["ground","Horizon",true],["compass","Compass letters",true],["grid","Alt-az grid",false]]],
@@ -645,7 +649,7 @@ const store = {get(k, d) { try { const v = localStorage.getItem(k); return v ===
 const FD = getComputedStyle(document.documentElement).getPropertyValue("--f-display").trim();
 const FB = getComputedStyle(document.documentElement).getPropertyValue("--f-body").trim();
 const FM = getComputedStyle(document.documentElement).getPropertyValue("--f-data").trim();
-const FR = getComputedStyle(document.documentElement).getPropertyValue("--f-rashi").trim();   // rashi names, house numbers and nakshatras
+const FR = getComputedStyle(document.documentElement).getPropertyValue("--f-rashi").trim();   // the zodiac sign names only
 // the canvas can only draw with a font once it has loaded, so ask for them up front and redraw when they arrive
 if (document.fonts && document.fonts.load) Promise.all(["16px OPTIOpus", "16px Advercase", "16px Archivo", "600 16px Archivo"].map(f => document.fonts.load(f).catch(() => null))).then(() => { skyDirty = true; });
 
@@ -653,6 +657,7 @@ if (document.fonts && document.fonts.load) Promise.all(["16px OPTIOpus", "16px A
 const layers = {}; for (const [, items] of LAYER_GROUPS) for (const [k, , on] of items) layers[k] = on;
 layers.labels = true;
 Object.assign(layers, store.get("gocharsky.layers2", {}));
+layers.birth = false;   // the faint birth-chart planets always start hidden; tick them in Filters to see them
 let lang = store.get("gocharsky.lang2", "en");
 let people = [DEFAULT_PERSON, ...(Array.isArray(store.get("gocharsky.people", [])) ? store.get("gocharsky.people", []) : [])];
 const curId = store.get("gocharsky.current", null);
@@ -1266,7 +1271,7 @@ function drawOverlay(t) {
     const mid = s * 30 + 15, o = alongBand(mid); if (!o) continue;
     const pName = pECL(mid, o.flip ? -3.2 : 3.2), pHouse = pECL(mid, o.flip ? 3.6 : -3.6), house = ((s - lagnaSign + 12) % 12) + 1;
     if (labels && layers.signs && onScreen(pName, 0)) { ctx.save(); ctx.translate(pName[0], pName[1]); ctx.rotate(o.ang); text(ctx, signName(s).toUpperCase(), 0, 0, "rgba(240,214,160,.92)", `${fs}px ${FR}`); ctx.restore(); }
-    if (layers.houses && onScreen(pHouse, 0)) { ctx.save(); ctx.translate(pHouse[0], pHouse[1]); ctx.rotate(o.ang); text(ctx, String(house), 0, 0, house === 1 ? "rgba(255,236,190,1)" : "rgba(233,201,135,.72)", `${fs}px ${FR}`); ctx.restore(); }
+    if (layers.houses && onScreen(pHouse, 0)) { ctx.save(); ctx.translate(pHouse[0], pHouse[1]); ctx.rotate(o.ang); text(ctx, String(house), 0, 0, house === 1 ? "rgba(255,236,190,1)" : "rgba(233,201,135,.72)", `600 ${Math.round(fs * 0.92)}px ${FM}`); ctx.restore(); }
     const pc = pECL(mid, 0);
     if ((layers.band || layers.signs || layers.houses) && onScreen(pc, 0) && !under(horOfECL(mid, 0)))
       hits.push({x: pc[0], y: pc[1], r: 26, html: `<b>${signFull(s)}</b><br>${ord(house)} house from ${esc(person.name)}'s Lagna · ${ord(((s - moonSign + 12) % 12) + 1)} from the Moon`});
@@ -1402,6 +1407,10 @@ const HV_K = 2.25;
    The frame stops shrinking in degrees after step 1 and grows taller instead, so the Moon still fits. */
 const HV_K2 = 1.75;
 const hvZmax = () => W < 760 ? 2 : 1;
+// zoomed out: about six houses in the frame (about four on a phone, where six would be too small to read)
+const hvZmin = () => W < 760 ? -0.5 : -1;
+const hvLevels = () => [hvZmin(), 0, 1].concat(hvZmax() === 2 ? [2] : []);
+const hvLevelAt = z => { const L = hvLevels(); let bi = 0; L.forEach((v, i) => { if (Math.abs(v - z) < Math.abs(L[bi] - z)) bi = i; }); return bi; };
 const hvZF = z => z <= 1 ? Math.pow(HV_K, z) : HV_K * Math.pow(HV_K2, z - 1);
 let hvZ = 0;   // the zoom being drawn this frame
 const hvZl = () => clamp((hvZ - 0.35) / 0.55, 0, 1);   // how far the zoomed-in details have faded in
@@ -1435,7 +1444,8 @@ function hvLam(now) {
 let hvPrevCam = "";
 function houseCam(now) {
   hvZ = hvZoomNow(now); const aw = hvArea(now);
-  if (!hv.zt && hv.zGoal == null && hv.z > hvZmax() + 0.001) hvZoomTo(hvZmax());   // e.g. a phone turned to a wide screen
+  if (!hv.zt && hv.zGoal == null && hv.z > hvZmax() + 0.001) hvZoomTo(hvZmax());
+  if (!hv.zt && hv.zGoal == null && hv.z < hvZmin() - 0.001) hvZoomTo(hvZmin());   // e.g. a phone turned to a wide screen
   const csig = hvZ.toFixed(4) + "|" + aw.toFixed(1);   // zooming or making room for the panel moves the stars too
   if (csig !== hvPrevCam) { hvPrevCam = csig; skyDirty = true; trailReset = true; }
   const tgt = hvBasis(hvLam(now));
@@ -1517,7 +1527,7 @@ function hvZoomNow(now) {
   return hv.z || 0;
 }
 const hvZoomGoal = () => hv && hv.zGoal != null ? hv.zGoal : hvZoomNow(performance.now());
-function hvZoomSet(z) { if (!hv || hv.mode === "exit") return; hv.zt = null; hv.zGoal = clamp(z, 0, hvZmax()); }   // follows the fingers
+function hvZoomSet(z) { if (!hv || hv.mode === "exit") return; hv.zt = null; hv.zGoal = clamp(z, hvZmin(), hvZmax()); }   // follows the fingers
 let closeTipShown = false;
 function hvZoomTo(target) {   // glides to three houses (0), one house (1) or, on phones, a close-up (2)
   if (target === 1 && hvZmax() === 2 && !closeTipShown && hv && Math.round(hv.z || 0) === 0) { closeTipShown = true; toast("Spread two fingers again for a close-up", 2200); }
@@ -1527,12 +1537,12 @@ function hvZoomTo(target) {   // glides to three houses (0), one house (1) or, o
   hv.zt = {from, to: target, t0: now, dur: 240 + 360 * Math.abs(target - from)};
 }
 // when a pinch ends, settle on one house or three, leaning the way the fingers moved
-function hvZoomSettle(z0) {
-  const z = hvZoomGoal(), dz = z - z0, r0 = Math.round(z0), mx = hvZmax();
-  hvZoomTo(dz > 0.08 ? Math.min(mx, Math.max(r0 + 1, Math.round(z))) : dz < -0.08 ? Math.max(0, Math.min(r0 - 1, Math.round(z))) : Math.min(mx, r0));
+function hvZoomSettle(z0) {   // settle on a zoom level, leaning the way the fingers moved
+  const L = hvLevels(), z = hvZoomGoal(), dz = z - z0, i0 = hvLevelAt(z0), iz = hvLevelAt(z);
+  hvZoomTo(L[dz > 0.08 ? Math.min(L.length - 1, Math.max(i0 + 1, iz)) : dz < -0.08 ? Math.max(0, Math.min(i0 - 1, iz)) : i0]);
 }
-// one step in or out (keys, double tap)
-const hvZoomStep = d => hvZoomTo(clamp(Math.round(hvZoomGoal()) + d, 0, hvZmax()));
+// one step in or out (keys)
+const hvZoomStep = d => { const L = hvLevels(); hvZoomTo(L[clamp(hvLevelAt(hvZoomGoal()) + d, 0, L.length - 1)]); };
 function markHV() {
   const on = !!hv && hv.mode !== "exit";
   $("houses").setAttribute("aria-pressed", String(on)); $("houses-l").textContent = on ? "Sky view" : "House view";
@@ -1557,12 +1567,12 @@ function drawHouseFrame(ctx) {
   // degree scale along the bottom edge: a long tick at each sign boundary, 10° and 20° marked;
   // zoomed in, every degree gets a tick and every 5° a label under the scale
   const base = Math.floor(lam / 30) * 30, fine = zl > 0 && pxDeg >= 8;
-  for (let L = base - 60; L <= base + 90; L += fine ? 1 : 5) {
+  for (let L = base - 120; L <= base + 150; L += fine ? 1 : 5) {
     if (Math.abs(L - lam) > half + 0.01) continue;
     const p = pECL(L, -latH); if (!p) continue; const d = ((L % 30) + 30) % 30, edge = d === 0;
     ctx.globalAlpha = a * (d % 5 ? zl : 1); ctx.strokeStyle = "rgba(233,201,135,.6)";
     ctx.lineWidth = edge ? 1.4 : 1; ctx.beginPath(); ctx.moveTo(p[0], y1); ctx.lineTo(p[0], y1 - (edge ? 14 : d % 10 === 0 ? 8 : d % 5 === 0 ? 5 : 3)); ctx.stroke();
-    if (!edge && d % 10 === 0 && tall && zl < 0.5) { ctx.globalAlpha = a * (1 - 2 * zl); text(ctx, d + "°", p[0], y1 - 18, "rgba(233,201,135,.7)", `10px ${FM}`); }   // too cramped on phones: ticks only
+    if (!edge && d % 10 === 0 && tall && zl < 0.5 && pxDeg * 10 >= 34) { ctx.globalAlpha = a * (1 - 2 * zl); text(ctx, d + "°", p[0], y1 - 18, "rgba(233,201,135,.7)", `10px ${FM}`); }   // too cramped on phones: ticks only
     if (!edge && d % 5 === 0 && rulerBelow) { ctx.globalAlpha = a * zl; text(ctx, d + "°", p[0], y1 + 11, "rgba(233,201,135,.8)", `10px ${FM}`); }
   }
   ctx.globalAlpha = a;
@@ -1578,7 +1588,7 @@ function drawHouseFrame(ctx) {
       }
       const v0 = Math.max(s0, lo), v1 = Math.min(s1, hi); if (v1 - v0 < 0.5) continue;
       const pa = pECL(v0, latH), pz = pECL(v1, latH); if (!pa || !pz) continue;
-      const font = `12px ${FR}`; ctx.font = font; if (ctx.measureText(NAK[nn]).width + 14 > Math.abs(pz[0] - pa[0])) continue;
+      const font = `600 11px ${FM}`; ctx.font = font; if (ctx.measureText(NAK[nn]).width + 14 > Math.abs(pz[0] - pa[0])) continue;
       const nx = (pa[0] + pz[0]) / 2, ny = y0 + 18;
       text(ctx, NAK[nn], nx, ny, "rgba(150,226,216,.92)", font);
       if (zl > 0.6) hits.push({x: nx, y: ny, r: 14, html: `<b>${NAK[nn]}</b> nakshatra<br><span class="m">${dms(s0)} ${RASHI[signOf(s0)]} to ${dms(s1 - 0.0001)} ${RASHI[signOf(s1 - 0.0001)]}</span>`});
@@ -1588,18 +1598,21 @@ function drawHouseFrame(ctx) {
   if (hv.mode === "on") {
     // captions under the three houses: house number, sign, then the planets in it now and at birth
     const fsz = W < 600 ? 10.5 : 12.5;
-    for (let k = -1; k <= 1; k++) {
+    const wide = clamp(-hvZ / -hvZmin(), 0, 1), colW = 30 * pxDeg, kMax = wide > 0.02 ? 2 : 1;
+    for (let k = -kMax; k <= kMax; k++) {
       const s = ((cs + k) % 12 + 12) % 12, pc = pECL((cs + k) * 30 + 15, 0); if (!pc) continue;
-      const x = pc[0], centre = k === 0, ca = centre ? 1 : 1 - zl; if (ca < 0.02) continue;
+      const x = pc[0], centre = k === 0, ca = (centre ? 1 : 1 - zl) * (Math.abs(k) === 2 ? wide : 1); if (ca < 0.02) continue;
+      if (x < x0 - 10 || x > x1 + 10) continue;
       let y = y1 + 24 + (rulerBelow ? 12 * zl : 0);
       ctx.globalAlpha = a * ca;
-      text(ctx, String(houseNo(s)), x, y, centre ? "rgba(255,236,190,1)" : "rgba(233,201,135,.7)", `${centre ? 24 : 18}px ${FR}`); y += centre ? 22 : 18;
+      text(ctx, String(houseNo(s)), x, y, centre ? "rgba(255,236,190,1)" : "rgba(233,201,135,.7)", `600 ${centre ? 20 : 15}px ${FM}`); y += centre ? 22 : 18;
       text(ctx, W < 600 ? signName(s) : signFull(s), x, y, centre ? "rgba(237,236,250,.95)" : "rgba(167,166,212,.8)", `${fsz}px ${FR}`); y += fsz + 9;
       const items = [];
       if (layers.now) for (const b of PLANETS) if (signOf(bodies[b].lon) === s) items.push({b, t: `${b} ${dms(bodies[b].lon)}${bodies[b].retro ? " R" : ""}`});
       if (layers.birth) { for (const b of PLANETS) if (signOf(natal[b].lon) === s) items.push({b, t: `birth ${b} ${dms(natal[b].lon)}`, birth: true});
         if (signOf(natal.Asc.lon) === s) items.push({b: null, t: `birth Lagna ${dms(natal.Asc.lon)}`, birth: true}); }
       ctx.font = `${fsz}px ${FB}`;
+      if (colW < 92) items.length = 0;   // too narrow to list planets under each house
       for (const it of items.slice(0, 9)) {
         const w = ctx.measureText(it.t).width, lx = x - w / 2 + 7;
         ctx.globalAlpha = a * ca * (it.birth ? 0.55 : 1);
@@ -1614,8 +1627,10 @@ function drawHouseFrame(ctx) {
     Lb.style.left = Math.max(6, x0 - Lb.offsetWidth - 10) + "px"; Lb.style.top = (cy - Lb.offsetHeight / 2) + "px";
     Rb.style.left = Math.min((hvAreaW || W) - Rb.offsetWidth - 6, x1 + 10) + "px"; Rb.style.top = (cy - Rb.offsetHeight / 2) + "px";
     const narrowHV = (hvAreaW || W) < 760;
-    const ctrlTop = narrowHV ? Rb.offsetTop + Rb.offsetHeight + 10 : Math.max(6, y0 - Xc.offsetHeight - 10);
-    Xc.style.left = (narrowHV ? Rb.offsetLeft + (Rb.offsetWidth - Xc.offsetWidth) / 2 : Math.max(6, x1 - Xc.offsetWidth)) + "px"; Xc.style.top = ctrlTop + "px";
+    // phones: the Insights button joins the top bar, beside the House view button, so it covers nothing on the sky
+    const appR = $("app").getBoundingClientRect(), hb = $("houses").getBoundingClientRect();
+    const ctrlTop = narrowHV ? hb.top - appR.top + (hb.height - Xc.offsetHeight) / 2 : Math.max(6, y0 - Xc.offsetHeight - 10);
+    Xc.style.left = (narrowHV ? hb.left - appR.left - Xc.offsetWidth - 8 : Math.max(6, x1 - Xc.offsetWidth)) + "px"; Xc.style.top = ctrlTop + "px";
     if (!covered) placeInsights(x0, x1, narrowHV ? y0 - 2 : ctrlTop, cs);
     const ls = ((cs + 1) % 12 + 12) % 12, rs = ((cs + 11) % 12);
     Lb.setAttribute("aria-label", `Show house ${houseNo(ls)}, ${signFull(ls)}`); Rb.setAttribute("aria-label", `Show house ${houseNo(rs)}, ${signFull(rs)}`);
@@ -2248,7 +2263,7 @@ function hvTap(p) {   // a tap shows what is under it; a double tap zooms the ho
   const now = performance.now(), near = Math.hypot(p[0] - lastTapXY[0], p[1] - lastTapXY[1]) < 30;
   tapCount = now - lastTap < 350 && near ? tapCount + 1 : 1; lastTap = now; lastTapXY = p; clearTimeout(tapTimer);
   if (tapCount === 1) showTip(p[0], p[1], true);
-  else if (tapCount === 2) { $("tip").hidden = true; tapTimer = setTimeout(() => { if (tapCount === 2 && hv) { const z = Math.round(hvZoomNow(performance.now())); hvZoomTo(z >= hvZmax() ? 0 : z + 1); } }, 300); }
+  else if (tapCount === 2) { $("tip").hidden = true; tapTimer = setTimeout(() => { if (tapCount === 2 && hv) { const L = hvLevels(), i = hvLevelAt(hvZoomNow(performance.now())); hvZoomTo(L[i] < 0 || i >= L.length - 1 ? 0 : L[i + 1]); } }, 300); }
   else { tapCount = 0; exitHV(); }
 }
 let hvWheelZ = null, gz = null;
@@ -2303,7 +2318,7 @@ window.addEventListener("keydown", e => {
   if (e.key === " ") { if (e.target.closest("button,a,summary")) return; e.preventDefault(); togglePlay(); return; }
   const code = e.code, onBtn = e.target.closest("button,a,summary");
   if (e.key === "Escape") {
-    if (hv) { if (hvZoomNow(performance.now()) > 0.5) hvZoomStep(-1); else exitHV(); }
+    if (hv) { const z = hvZoomNow(performance.now()); if (z > 0.5) hvZoomStep(-1); else if (z < -0.25) hvZoomTo(0); else exitHV(); }
     else if (!$("panel").hidden) setPanel(false); else if (focus) setFocus(null); else return;
     e.preventDefault(); return;
   }
@@ -2547,7 +2562,7 @@ function updateReadings(contacts) {
   if (contacts.length) out.push(["hit", `${contacts.length} close contact${contacts.length > 1 ? "s" : ""}`]);
   $("readings").innerHTML = out.map(([c, h]) => `<span class="pill ${c}">${h}</span>`).join("");
   $("contacts").innerHTML = contacts.length ? contacts.slice().sort((a, b) => a.o - b.o).map(c => `<li class="contact"><span class="orb">${c.o.toFixed(1)}°</span><span>${c.b}${bodies[c.b].retro ? " (retrograde)" : ""} on birth <b>${c.n === "Asc" ? "Lagna" : c.n}</b></span></li>`).join("") : `<li class="empty">No planet is within 3° of a birth planet. The Moon is left out because it moves about 13° a day.</li>`;
-  const mode = hv ? (hvZ > 1.5 ? "close-up" : hvZ > 0.5 ? "one house" : "house view") : jump ? "travelling…" : live ? "live" : rate === 0 ? "paused" : rate === 1 ? "playing" : (RATES.find(r => r[0] === rate) || [, ""])[1];
+  const mode = hv ? (hvZ > 1.5 ? "close-up" : hvZ > 0.5 ? "one house" : hvZ < -0.25 ? "wide view" : "house view") : jump ? "travelling…" : live ? "live" : rate === 0 ? "paused" : rate === 1 ? "playing" : (RATES.find(r => r[0] === rate) || [, ""])[1];
   $("status").innerHTML = `<b>${esc(shortPlace(loc.name))}</b> · ${mode}`;
 }
 
