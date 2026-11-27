@@ -608,7 +608,7 @@ const RATES = [[-604800,"−1 wk/s"],[-86400,"−1 day/s"],[1,"Live"],[86400,"+1
 const LAYER_GROUPS = [
   ["Planets", [["now","Planets now",true],["birth","Birth chart (faint)",true],["contacts","Close contacts",true]]],
   ["Zodiac",  [["band","Sign bands",true],["signs","Sign names",true],["houses","House numbers",true],["nak","Nakshatras",false]]],
-  ["Sky",     [["aurora","Aurora",true],["mw","Milky Way",true],["const","Constellation lines",true],["starnames","Bright star names",false],["moonpath","Moon phases ahead",true],["trails","Star trails when fast",true],["day","Real daylight",false]]],
+  ["Sky",     [["aurora","Aurora",true],["mw","Milky Way",true],["const","Constellation lines",true],["starnames","Bright star names",false],["moonpath","Moon phases ahead",true],["trails","Trails when time moves fast",true],["day","Real daylight",false]]],
   ["Ground",  [["ground","Horizon",true],["compass","Compass letters",true],["grid","Alt-az grid",false]]],
   ["House view", [["insights","House insights",true]]]
 ];
@@ -888,7 +888,8 @@ function paintGradient(ctx, alpha) {
   }
   return day;
 }
-function trailsActive() { return layers.trails && !hv && !dragging && !jump && !live && Math.abs(rate) >= 3600; }
+function trailsActive() { return layers.trails && !hv && !dragging && (jump ? jumpSkyMoving() : !live && Math.abs(rate) >= 3600 && Math.abs(rate) < 2 * 86400); }   // faster than that the stars spin too fast to leave a trail; the planets' trails carry the speed
+function jumpSkyMoving() { return Math.abs(norm180(jump.lst1 - jump.lst0)) > 8; }
 /* Star dust: fine faint specks scattered through the Milky Way and around the bright stars. They are painted with the
    still star layer; about one in nine also glows softly in and out on the layer above. */
 const DUST = [], DUST_LIVE = [];
@@ -931,11 +932,11 @@ function drawDustGlow(ctx, t) {   // some specks glow in and out
 function drawSky(trails) {
   const ctx = sctx; ctx.globalCompositeOperation = "source-over";
   let fade = 1, day;
-  if (trails && !trailReset) { fade = Math.abs(rate) >= 86400 ? 0.06 : 0.03; day = paintGradient(ctx, fade); }
+  if (trails && !trailReset) { fade = jump ? 0.07 : Math.abs(rate) >= 86400 ? 0.06 : 0.03; day = paintGradient(ctx, fade); }
   else { day = paintGradient(ctx, 1); prevX.fill(NaN); }
   if (hvAmt > 0.01) { const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, `rgba(5,6,28,${hvAmt})`); g.addColorStop(1, `rgba(24,19,70,${hvAmt})`); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); }
   const zk = clamp(Math.sqrt(110 / view.fov), 0.8, 2.6), dim = 1 - day * 0.92;
-  if (layers.mw && day < 0.6) {
+  if (layers.mw && day < 0.6 && !(trails && !jump && Math.abs(rate) >= 86400)) {   // spun fast, the Milky Way would smear into fog
     ctx.globalCompositeOperation = "lighter";
     const base = (trails ? fade * 1.4 : 1) * (1 - day), ang = 1.3 * DEG * cam.S;
     for (let i = 0; i < NMW; i++) {
@@ -1115,6 +1116,71 @@ function drawBody(ctx, b, x, y, r, o) {
   if (o.birth) { ctx.globalAlpha = 0.6; ctx.strokeStyle = `rgba(${P[b].rgb},.9)`; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x, y, r + 1.5, 0, 6.2832); ctx.stroke(); }
   ctx.globalAlpha = 1;
 }
+/* Planet trails. Each planet keeps where it was over the last second of real time; the trail is drawn
+   along that path on the sky, so its length shows how fast the planet is moving at the speed time is running.
+   Between two frames a fast planet can move a long way, so the path is filled in along the zodiac in the
+   direction the planet travels (its average daily motion tells which way round, and roughly how far). */
+const TRAIL_MS = 900;
+const MEAN_MOTION = {Sun: 0.9856, Moon: 13.176, Mercury: 0.9856, Venus: 0.9856, Mars: 0.524, Jupiter: 0.0831, Saturn: 0.0335, Rahu: -0.0529, Ketu: -0.0529};   // degrees a day, seen from Earth
+const trailHist = {}; let trailPx = 0;
+function recordTrails(tp, now) {
+  for (const b of PLANETS) {
+    const h = trailHist[b] || (trailHist[b] = []), o = bodies[b];
+    h.push({t: now, tp, lon: o.lon, lat: o.lat || 0});
+    while (h.length > 2 && now - h[0].t > TRAIL_MS) h.shift();
+  }
+}
+const TRAIL_MAX = 110;   // degrees: a long comet tail at most, never a ring
+function trailPath(b) {   // [{lon, lat}] oldest first, unwrapped and filled in every 2°
+  const h = trailHist[b]; if (!h || h.length < 2) return null;
+  const last = h[h.length - 1], out = []; let lon = h[0].lon, span = 0, tooFast = false;
+  for (let i = 1; i < h.length && !tooFast; i++) {
+    const a = h[i - 1], c = h[i], exp = MEAN_MOTION[b] * (c.tp - a.tp) / DAY;
+    if (Math.abs(exp) > 150) { tooFast = Math.abs(exp) > 0; break; }
+    let d = norm180(c.lon - a.lon); d += 360 * Math.round((exp - d) / 360);
+    const n = Math.max(1, Math.ceil(Math.abs(d) / 2));
+    for (let k = 0; k < n; k++) out.push({lon: lon + d * k / n, lat: a.lat + (c.lat - a.lat) * k / n});
+    lon += d; span += Math.abs(d);
+  }
+  if (tooFast) {   // it goes round more than we can follow between frames: draw a full-length tail along the zodiac behind it
+    const dir = Math.sign(MEAN_MOTION[b] * (last.tp - h[0].tp)) || 1, res = [];
+    for (let k = 0; k <= TRAIL_MAX; k += 2) res.push({lon: last.lon - dir * (TRAIL_MAX - k), lat: last.lat});
+    return res;
+  }
+  out.push({lon, lat: last.lat});
+  let tot = 0; for (let i = out.length - 1; i > 0; i--) { tot += Math.abs(out[i].lon - out[i - 1].lon); if (tot > TRAIL_MAX) { out.splice(0, i); break; } }
+  return span > 0.05 ? out : null;
+}
+function drawTrails(ctx, zs, under) {
+  if (!layers.trails || !layers.now) return;
+  ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.lineCap = "round";
+  for (const b of PLANETS) {
+    const path = trailPath(b); if (!path) continue;
+    const pts = path.map(q => { const v = eclToEQJ(F, q.lon, q.lat), p = pEQJ(v); return p && !under(mul(F.EQJ_HOR, v)) ? p : null; });
+    let len = 0; for (let i = 1; i < pts.length; i++) if (pts[i] && pts[i - 1]) len += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+    if (len < 10) continue;   // barely moving: no trail
+    const r = radiusOf(b, bodies[b].vec), n = pts.length, rgb = P[b].glow, strength = clamp(len / 160, 0.35, 1) * Math.max(0.55, jumpFade(b));
+    const core = Math.min(5, Math.max(1.6, r * 0.55)), halo = Math.min(16, Math.max(5, r * 1.5));
+    for (let pass = 0; pass < 2; pass++) {
+      for (let i = 1; i < n; i++) {
+        const a = pts[i - 1], c = pts[i]; if (!a || !c) continue;
+        if (Math.hypot(c[0] - a[0], c[1] - a[1]) > Math.min(W, H) * 0.3) continue;   // wrapped round the edge of the view
+        const f = i / (n - 1), taper = 0.15 + 0.85 * f * f;
+        ctx.strokeStyle = `rgba(${rgb},${(pass ? 0.72 : 0.13) * Math.pow(f, 1.6) * strength})`;
+        ctx.lineWidth = (pass ? core : halo) * taper;
+        ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(c[0], c[1]); ctx.stroke();
+      }
+    }
+    // a few soft sparks drift off the tail
+    if (!REDUCED) for (let i = 3; i < n - 3; i += 4) {
+      const p = pts[i]; if (!p) continue; const f = i / (n - 1), tw = 0.5 + 0.5 * Math.sin(i * 12.9898 + performance.now() / 110);
+      const g = 1 + core * 0.6 * f, off = halo * 0.45 * (1 - f);
+      ctx.globalAlpha = 0.35 * f * tw * strength; ctx.drawImage(STAR_GLOW, p[0] + Math.sin(i * 7.3) * off - g, p[1] + Math.cos(i * 5.1) * off - g, 2 * g, 2 * g);
+    }
+    ctx.globalAlpha = 1;
+  }
+  ctx.restore();
+}
 function jumpFade(b) {
   if (!jump) return 1;
   const revs = Math.abs(jump.to - jump.from) / DAY / PERIOD[b]; if (revs < 2.5) return 1;
@@ -1136,7 +1202,7 @@ function drawOverlay(t) {
     for (let alt = 15; alt < 90; alt += 15) { const pts = []; for (let az = 0; az <= 360; az += 3) pts.push(pHOR(horFromAltAz(alt, az))); polyline(ctx, pts); }
     for (let az = 0; az < 360; az += 30) { const pts = []; for (let alt = 0; alt <= 90; alt += 3) pts.push(pHOR(horFromAltAz(alt, az))); polyline(ctx, pts); }
   }
-  if (layers.const && !trailsActive()) { ctx.strokeStyle = "rgba(170,165,240,.20)"; ctx.lineWidth = 1; for (const line of CL) polyline(ctx, line.map(v => pEQJ(v))); }
+  if (layers.const && !(trailsActive() && !jump)) { ctx.strokeStyle = "rgba(170,165,240,.20)"; ctx.lineWidth = 1; for (const line of CL) polyline(ctx, line.map(v => pEQJ(v))); }
 
   // zodiac bands: alternating opacity, no lines (in a zoomed house view they shrink to the frame's height)
   const bandLat = hv ? Math.min(7, hvLatH() * 0.97) : 7;
@@ -1211,6 +1277,7 @@ function drawOverlay(t) {
     const r = radiusOf(c.b, bodies[c.b].vec);
     ctx.strokeStyle = `rgba(255,255,255,${0.22 + 0.3 * pulse})`; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.arc(pb[0], pb[1], r + 6 + 4 * pulse, 0, 6.2832); ctx.stroke();
   }
+  drawTrails(ctx, zs, under);
   // planets now
   if (layers.now) for (const b of PLANETS) {
     const o = bodies[b], p = pEQJ(o.vec); if (!onScreen(p, 60)) continue;
@@ -2458,6 +2525,7 @@ function frame(ts) {
   const {tp, tf} = times(ts);
   const fast = jump || (!live && Math.abs(rate) > 1);
   if (needBodies || !F || fast || Math.abs(tp - lastTp) > 1000) { computeBodies(tp, tf); lastTp = tp; lastTf = tf; needBodies = false; skyDirty = true; }
+  recordTrails(lastTp, ts);
   if (layers.moonpath && !jump && (live || Math.abs(rate) <= 3600)) updateMoonPath(tp);
   updateView(dt); buildCam();
   if (skyDirty || trailsActive()) { drawSky(trailsActive()); skyDirty = false; }
