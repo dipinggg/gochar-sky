@@ -1596,7 +1596,7 @@ function drawHouseFrame(ctx) {
     ctx.globalAlpha = a;
   }
   if (hv.mode === "on") {
-    // captions under the three houses: house number, sign, then the planets in it now and at birth
+    // under each house: the planets in it now (and at birth, when shown)
     const fsz = W < 600 ? 10.5 : 12.5;
     const wide = clamp(-hvZ / -hvZmin(), 0, 1), colW = 30 * pxDeg, kMax = wide > 0.02 ? 2 : 1;
     for (let k = -kMax; k <= kMax; k++) {
@@ -1605,14 +1605,13 @@ function drawHouseFrame(ctx) {
       if (x < x0 - 10 || x > x1 + 10) continue;
       let y = y1 + 24 + (rulerBelow ? 12 * zl : 0);
       ctx.globalAlpha = a * ca;
-      text(ctx, String(houseNo(s)), x, y, centre ? "rgba(255,236,190,1)" : "rgba(233,201,135,.7)", `600 ${centre ? 20 : 15}px ${FM}`); y += centre ? 22 : 18;
-      text(ctx, W < 600 ? signName(s) : signFull(s), x, y, centre ? "rgba(237,236,250,.95)" : "rgba(167,166,212,.8)", `${fsz}px ${FR}`); y += fsz + 9;
+      // the band above already shows each house's number and sign, so only the planets are listed here
       const items = [];
       if (layers.now) for (const b of PLANETS) if (signOf(bodies[b].lon) === s) items.push({b, t: `${b} ${dms(bodies[b].lon)}${bodies[b].retro ? " R" : ""}`});
       if (layers.birth) { for (const b of PLANETS) if (signOf(natal[b].lon) === s) items.push({b, t: `birth ${b} ${dms(natal[b].lon)}`, birth: true});
         if (signOf(natal.Asc.lon) === s) items.push({b: null, t: `birth Lagna ${dms(natal.Asc.lon)}`, birth: true}); }
       ctx.font = `${fsz}px ${FB}`;
-      if (colW < 92) items.length = 0;   // too narrow to list planets under each house
+      if (hvZ < -0.1 && colW < 92) items.length = 0;   // zoomed out on a small screen: too narrow to list planets under each house
       for (const it of items.slice(0, 9)) {
         const w = ctx.measureText(it.t).width, lx = x - w / 2 + 7;
         ctx.globalAlpha = a * ca * (it.birth ? 0.55 : 1);
