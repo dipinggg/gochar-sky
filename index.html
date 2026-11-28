@@ -398,7 +398,7 @@ kbd{border:0;background:rgba(255,255,255,.12);box-shadow:0 2px 0 rgba(0,0,0,.4)}
   <div class="hud hvctrl" id="hv-ctrl" hidden>
     <button class="btn glass insbtn" id="hv-ins" type="button" aria-pressed="true" title="House insights"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5"/><path d="M12 7.6h.01" stroke-width="2.6"/></svg><span>Insights</span></button>
   </div>
-  <section class="hud hvinfo" id="hv-info" hidden aria-live="polite" aria-label="House insights"></section>
+  <section class="hud hvinfo" id="hv-info" hidden aria-live="polite" aria-label="Insights"></section>
 
   <div class="modal" id="keys" role="dialog" aria-modal="true" aria-labelledby="keys-title" hidden>
     <div class="card glass keyscard">
@@ -414,7 +414,7 @@ kbd{border:0;background:rgba(255,255,255,.12);box-shadow:0 2px 0 rgba(0,0,0,.4)}
           <dt><kbd>H</kbd></dt><dd>Open or close House view</dd>
           <dt><kbd>A</kbd><kbd>D</kbd></dt><dd>Previous or next house (or ← →)</dd>
           <dt><kbd>W</kbd><kbd>S</kbd></dt><dd>Zoom into one house, back to three</dd>
-          <dt><kbd>I</kbd></dt><dd>Show or hide insights</dd>
+          <dt><kbd>I</kbd></dt><dd>Insights: the whole chart (sky) or the house (House view)</dd>
           <dt><kbd>Esc</kbd></dt><dd>Zoom out, then back to the sky</dd>
         </dl></section>
         <section><h3>Time</h3><dl>
@@ -1346,11 +1346,15 @@ function drawOverlay(t) {
       }
       if (run.length < 2) return;
       const ys = run.map(p => p[1]), g = ctx.createLinearGradient(0, Math.max(-H, Math.min(...ys)), 0, H); g.addColorStop(0, top); g.addColorStop(1, "#020309");
+      // looking up, the skyline is a ring (or nearly: only a short stretch far behind you is missing). Then the
+      // ground is everything outside it. Closing a nearly whole ring with drops to the bottom of the screen
+      // used to paint dark slabs over the sky.
+      const ring = view.alt > 0 && (!gaps || run.length > n * 0.75);
       ctx.globalAlpha = ga; ctx.beginPath();
-      if (!gaps && view.alt > 0) ctx.rect(-10, -10, W + 20, H + 20);   // ground outside the ring
+      if (ring) ctx.rect(-10, -10, W + 20, H + 20);   // ground outside the ring
       ctx.moveTo(run[0][0], run[0][1]); for (const p of run) ctx.lineTo(p[0], p[1]);
-      if (gaps) { ctx.lineTo(run[run.length - 1][0], H + 2000); ctx.lineTo(run[0][0], H + 2000); }
-      ctx.closePath(); ctx.fillStyle = !gaps && view.alt > 0 ? top : g; ctx.fill("evenodd");
+      if (!ring) { ctx.lineTo(run[run.length - 1][0], H + 2000); ctx.lineTo(run[0][0], H + 2000); }
+      ctx.closePath(); ctx.fillStyle = ring ? top : g; ctx.fill("evenodd");
       ctx.strokeStyle = edge; ctx.lineWidth = 1; ctx.beginPath(); run.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); if (!gaps) ctx.closePath(); ctx.stroke(); ctx.globalAlpha = 1;
     };
     const dune = az => { const z = az * DEG; return 0.9 + 1.4 * Math.max(0, Math.sin(2 * z + 0.7)) + 0.45 * Math.sin(5 * z + 1.9) + 0.2 * Math.sin(13 * z); };
@@ -1549,7 +1553,34 @@ function markHV() {
 }
 const houseNo = s => ((s - signOf(natal.Asc.lon) + 12) % 12) + 1;
 function rrect(ctx, x, y, w, h, r) { if (ctx.roundRect) ctx.roundRect(x, y, w, h, r); else ctx.rect(x, y, w, h); }
+/* Sky view insights: a card about the whole chart right now. The Insights button sits under the top-right buttons
+   (on phones, in the top bar beside them); the card starts closed each visit and opens from the button. */
+let skyInsOpen = false;
+function setInsPressed(v) { const b = $("hv-ins"), t = String(!!v); if (b.getAttribute("aria-pressed") !== t) b.setAttribute("aria-pressed", t); }
+function setSkyIns(on) { skyInsOpen = on; insKey = ""; setInsPressed(on); if (!on) closeIns(); }
+function placeSky() {
+  const Xc = $("hv-ctrl"), el = $("hv-info"), narrow = W < 760, covered = narrow && !$("panel").hidden;
+  for (const id of ["hv-left", "hv-right"]) $(id).hidden = true;
+  Xc.hidden = covered;
+  if (covered) { if (!el.hidden) { el.hidden = true; insState = "closed"; } return; }
+  setInsPressed(skyInsOpen);
+  const appR = $("app").getBoundingClientRect(), tb = $("topbar").getBoundingClientRect(), hb = $("houses").getBoundingClientRect();
+  const right = !narrow && !$("panel").hidden ? hvAreaTarget() : W;
+  const bl = narrow ? hb.left - appR.left - Xc.offsetWidth - 8 : right - Xc.offsetWidth - 16;
+  const bt = narrow ? hb.top - appR.top + (hb.height - Xc.offsetHeight) / 2 : tb.bottom - appR.top + 10;
+  Xc.style.left = bl + "px"; Xc.style.top = bt + "px";
+  if (!skyInsOpen && insState !== "closing") { if (!el.hidden) { el.hidden = true; insState = "closed"; } return; }
+  const top = narrow ? tb.bottom - appR.top + 8 : bt + Xc.offsetHeight + 8, floor = document.querySelector(".timebar").getBoundingClientRect().top - appR.top - 10;
+  if (floor - top < 90) { el.hidden = true; insState = "closed"; return; }
+  const width = narrow ? W - 20 : Math.min(500, right - 32), wasHidden = el.hidden; el.hidden = false;
+  el.classList.toggle("big", insBig);
+  el.style.left = (narrow ? 10 : right - width - 16) + "px"; el.style.width = width + "px"; el.style.top = top + "px"; el.style.bottom = "auto"; el.style.maxHeight = (floor - top) + "px";
+  const now = performance.now(), key = ["sky", Math.floor(lastTp / 60000), person.id, lang, insBig].join("|");
+  if (key !== insKey && (wasHidden || now - insT > 300 || !insKey.startsWith("sky"))) { const st = el.scrollTop, same = insKey.startsWith("sky"); insKey = key; insT = now; el.innerHTML = skyInsightsHTML(lastTp); if (same) el.scrollTop = st; }
+  if (wasHidden && skyInsOpen) openIns();
+}
 function drawHouseFrame(ctx) {
+  if (!hv) { placeSky(); return; }
   const onMode = !!hv && hv.mode === "on", covered = hvPanelCovers();
   for (const id of ["hv-left", "hv-right", "hv-ctrl"]) $(id).hidden = !onMode || covered;
   if (!onMode || covered) { $("hv-info").hidden = true; insState = "closed"; }
@@ -1957,11 +1988,15 @@ function overviewHTML(tp, da) {
   const nm = x => `${ord(x.h)} (${HOUSES[x.h - 1][1].split(", ").slice(0, 2).join(", ")})`;
   items.push(["Strongest now", `<span class="good">${hs.slice(0, 2).map(nm).join(", ")}</span>`]);
   items.push(["Under most pressure", `<span class="bad">${hs.slice(-2).reverse().map(nm).join(", ")}</span>`]);
+  const nmS = x => `${ord(x.h)} (${HOUSES[x.h - 1][1].split(", ")[0]})`;
+  const housesLine = `<b>Houses:</b> strongest are your <span class="good">${hs.slice(0, 2).map(nmS).join(" and ")}</span>; most pressed are your <span class="bad">${hs.slice(-2).reverse().map(nmS).join(" and ")}</span>.`;
+  let nextLine = "";
   // what changes next
   if (!fast) {
     const nx = [nextSignChange("Jupiter", tp, 5, 420), nextSignChange("Saturn", tp, 10, 1000), nextSignChange("Rahu", tp, 10, 600)].filter(Boolean);
     if (da) nx.push({b: "dasha", t: da.adEnd});
     nx.sort((a, b) => a.t - b.t);
+    if (nx[0]) nextLine = `<b>Next:</b> ${nx[0].b === "dasha" ? `a new Antardasha around ${fmtDay(nx[0].t)}` : `${nx[0].b} moves into your ${ord(houseNo(nx[0].to))} house (${signName(nx[0].to)}) around ${fmtDay(nx[0].t)}`}.`;
     items.push(["Coming up", nx.slice(0, 3).map(x => x.b === "dasha" ? `a new Antardasha around ${fmtDay(x.t)}` : `${x.b} moves into your ${ord(houseNo(x.to))} house (${signName(x.to)}) around ${fmtDay(x.t)}`).join("; ") + "."]);
   }
   const V = score >= 1.5 ? ["Well supported", "good"] : score >= 0.4 ? ["Leaning good", "good"] : score > -0.6 ? ["Mixed", "mixed"] : score > -1.8 ? ["Some pressure", "bad"] : ["Under pressure", "bad"];
@@ -1976,8 +2011,20 @@ function overviewHTML(tp, da) {
   const sn = fromMoon(bodies.Saturn.lon), jn = fromMoon(bodies.Jupiter.lon), jGood = GOOD_FROM_MOON.Jupiter.includes(jn);
   const phase = {12: "the first part of Sade Sati", 1: "the peak of Sade Sati", 2: "the last part of Sade Sati", 8: "Ashtama Shani (Saturn 8th from your Moon)", 4: "Kantaka Shani (Saturn 4th from your Moon)"}[sn];
   brief.push(`Saturn: ${phase ? `<span class="bad">${phase}</span>` : GOOD_FROM_MOON.Saturn.includes(sn) ? '<span class="good">helpful</span>' : "neutral"}; Jupiter: ${jGood ? '<span class="good">supportive</span>' : '<span class="bad">not supportive</span>'} (from your Moon).`);
-  const html = {V, body: `<p class="hvi-ovsum">${sum}</p>${rowsHTML(items)}`, brief: brief.join(" ")};
+  const html = {V, body: `<p class="hvi-ovsum">${sum}</p>${rowsHTML(items)}`, brief: brief.join(" "), housesLine, nextLine};
   ovCache.key = key; ovCache.html = html; return html;
+}
+function skyInsightsHTML(tp) {
+  const da = dashaAt(tp), ov = overviewHTML(tp, da);
+  const xIcon = insBig ? '<path d="M9 4v5H4"/><path d="M15 20v-5h5"/><path d="M4 4l5 5"/><path d="M20 20l-5-5"/>' : '<path d="M4 9V4h5"/><path d="M20 15v5h-5"/><path d="M4 4l6 6"/><path d="M20 20l-6-6"/>';
+  const rows = PLANETS.map(b => {
+    const o = bodies[b], sg = signOf(o.lon), n = fromMoon(o.lon), good = GOOD_FROM_MOON[b].includes(n), dg = dignityOf(b, o.lon), nk = nakOf(o.lon);
+    return [`${dot(b)}${b}${o.retro ? " ℞" : ""}`, `${signName(sg)}, your ${ord(houseNo(sg))} house · ${nk.name} · ${dg.label} · <span class="${good ? "good" : "bad"}">${good ? "supportive" : "testing"}</span> from your Moon (${ord(n)})`];
+  });
+  return `<div class="hvi-head"><b>Your chart now</b><span>${esc(person.name)}${da ? ` · ${da.md}–${da.ad} dasha` : ""}</span><span class="verdict ${ov.V[1]}">${ov.V[0]}</span><button class="hvi-x" type="button" data-act="expand" aria-label="${insBig ? "Make the reading smaller" : "Expand the reading"}" title="${insBig ? "Smaller" : "Expand"}"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${xIcon}</svg></button></div>
+  <div class="hvi-brief"><p><b>Right now:</b> ${ov.brief}</p><p>${ov.housesLine}${ov.nextLine ? " " + ov.nextLine : ""} <button class="hvi-more" type="button" data-act="expand">Full reading <span aria-hidden="true">›</span></button></p></div>
+  <div class="hvi-full">${ov.body}<h3 style="margin:12px 0 2px">Planets now</h3>${rowsHTML(rows)}
+  <p class="hvi-foot">For a reading of one house, open House view. Based on classical rules from Phaladeepika and Brihat Parashara Hora Shastra (transits from the Moon, Ashtakavarga, dignity, Vimshottari dasha). These are traditional readings, not certainties.</p></div>`;
 }
 function insightsHTML(s, tp) {
   const h = houseNo(s), [bhava, sig] = HOUSES[h - 1], lagnaSign = signOf(natal.Asc.lon), ms = signOf(natal.Moon.lon), av = ashtakavarga();
@@ -2068,6 +2115,7 @@ function insightsHTML(s, tp) {
 let insKey = "", insT = 0, insState = "closed";
 function placeInsights(x0, x1, ctrlTop, cs) {
   const el = $("hv-info");
+  setInsPressed(layers.insights);
   if (!layers.insights && insState !== "closing") { el.hidden = true; insState = "closed"; return; }
   const appTop = $("app").getBoundingClientRect().top, topLimit = $("topbar").getBoundingClientRect().bottom - appTop + 8;
   const bottom = insBig ? document.querySelector(".timebar").getBoundingClientRect().top - appTop - 10 : ctrlTop - 8, maxH = bottom - topLimit;
@@ -2075,7 +2123,7 @@ function placeInsights(x0, x1, ctrlTop, cs) {
   if (maxH < 70) { el.hidden = true; insState = "closed"; return; }
   const wasHidden = el.hidden; el.hidden = false;
   const aw = hvAreaW || W, narrow = aw < 760, left = narrow ? 10 : x0, width = narrow ? aw - 20 : x1 - x0;
-  el.style.left = left + "px"; el.style.width = width + "px"; el.style.bottom = (H - bottom) + "px"; el.style.maxHeight = maxH + "px";
+  el.style.left = left + "px"; el.style.width = width + "px"; el.style.top = "auto"; el.style.bottom = (H - bottom) + "px"; el.style.maxHeight = maxH + "px";
   const now = performance.now(), key = [cs, Math.floor(lastTp / 60000), person.id, lang, layers.now, layers.birth].join("|");
   if (key !== insKey && (wasHidden || now - insT > 300 || Math.floor(+insKey.split("|")[0]) !== cs)) { const sameHouse = Math.floor(+insKey.split("|")[0]) === cs, st = el.scrollTop; insKey = key; insT = now; el.innerHTML = insightsHTML(cs, lastTp); if (sameHouse) el.scrollTop = st; }
   if (wasHidden && layers.insights) openIns();
@@ -2100,7 +2148,7 @@ function closeIns() {
 }
 function markIns() { $("hv-ins").setAttribute("aria-pressed", String(!!layers.insights)); const cb = $("ly-insights"); if (cb) cb.checked = !!layers.insights; }
 function setInsights(on) { layers.insights = on; saveLayers(); markIns(); insKey = ""; if (!on) closeIns(); }
-$("hv-ins").addEventListener("click", () => setInsights(!layers.insights));
+$("hv-ins").addEventListener("click", () => { if (hv) setInsights(!layers.insights); else setSkyIns(!skyInsOpen); });
 $("hv-info").addEventListener("click", e => { if (e.target.closest("[data-act=expand]")) { insBig = !insBig; insKey = ""; } });
 $("hv-info").addEventListener("toggle", e => { const d = e.target, k = d.dataset && d.dataset.k; if (!k) return; if (d.open) { insOpen.add(k); insOpen.delete("!" + k); } else { insOpen.delete(k); insOpen.add("!" + k); } }, true);
 
@@ -2333,6 +2381,7 @@ window.addEventListener("keydown", e => {
     stepTo(e.shiftKey ? addYears(stepBase(), dir) : stepBase() + dir * DAY); e.preventDefault(); return;
   }
   if (/^Digit[1-9]$/.test(code)) { const b = PLANETS[+code.slice(5) - 1]; $("ix-" + b).click(); e.preventDefault(); return; }
+  if (code === "KeyI" && !hv) { setSkyIns(!skyInsOpen); e.preventDefault(); return; }   // sky view: the whole-chart reading
   if (hv) {   // House view: A/D or arrows step houses, W/S zoom one house, I toggles insights
     if (code === "KeyI") { setInsights(!layers.insights); e.preventDefault(); return; }
     const now = performance.now(), canStep = !e.repeat || now - hvKeyT > 420;
